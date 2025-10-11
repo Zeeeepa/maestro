@@ -52,6 +52,7 @@ interface Mission {
   generated_document_group_id?: string  // Document group created by this mission
   use_web_search?: boolean
   use_local_rag?: boolean
+  metadata?: Record<string, any>  // Full mission metadata including all settings
   createdAt: Date
   updatedAt: Date
 }
@@ -617,18 +618,19 @@ export const useMissionStore = create<MissionState>((set, get) => ({
   fetchMissionStatus: async (missionId: string) => {
     try {
       const response = await apiClient.get(`/api/missions/${missionId}/status`)
-      const { status, updated_at, tool_selection, document_group_id, generated_document_group_id } = response.data
-      
+      const { status, updated_at, tool_selection, document_group_id, generated_document_group_id, metadata } = response.data
+
       set((state) => {
         const updatedMissions = state.missions.map((mission) =>
           mission.id === missionId
-            ? { 
-                ...mission, 
+            ? {
+                ...mission,
                 status: status,
                 updatedAt: new Date(updated_at),
                 tool_selection: tool_selection,
                 document_group_id: document_group_id,
-                generated_document_group_id: generated_document_group_id
+                generated_document_group_id: generated_document_group_id,
+                metadata: metadata  // Store full metadata for complete settings visibility
               }
             : mission
         )

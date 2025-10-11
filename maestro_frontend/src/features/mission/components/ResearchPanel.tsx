@@ -435,30 +435,70 @@ export const ResearchPanel: React.FC = () => {
                   )}
                   
                   {/* Pending or Planning state: Show Start */}
-                  {(currentMission.status === 'pending' || currentMission.status === 'planning') && (
-                    <Button
-                      onClick={handleStartMission}
-                      variant="default"
-                      size="sm"
-                      className="text-xs"
-                    >
-                      <Play className="h-3 w-3 mr-1" />
-                      Start
-                    </Button>
-                  )}
+                  {(currentMission.status === 'pending' || currentMission.status === 'planning') && (() => {
+                    // Check if at least one source is available
+                    // Use metadata if available, otherwise fall back to tool_selection
+                    const hasWebSearch = currentMission.metadata?.use_web_search ??
+                                       currentMission.tool_selection?.web_search ?? false
+                    const hasDocumentGroup = (currentMission.metadata?.use_local_rag ||
+                                            currentMission.metadata?.document_group_id) ??
+                                          currentMission.tool_selection?.local_rag ?? false
+                    const hasSources = hasWebSearch || hasDocumentGroup
+
+                    return (
+                      <div className="flex items-center gap-2">
+                        <Button
+                          onClick={handleStartMission}
+                          variant="default"
+                          size="sm"
+                          className="text-xs"
+                          disabled={!hasSources}
+                          title={!hasSources ? 'Cannot start: No information sources enabled. Please configure Web Search or Document Group in the chat.' : ''}
+                        >
+                          <Play className="h-3 w-3 mr-1" />
+                          Start
+                        </Button>
+                        {!hasSources && (
+                          <span className="text-xs text-amber-600 dark:text-amber-400">
+                            ⚠️ No sources enabled
+                          </span>
+                        )}
+                      </div>
+                    )
+                  })()}
                   
                   {/* Paused, Stopped, or Failed state: Show Resume/Retry */}
-                  {(currentMission.status === 'paused' || currentMission.status === 'stopped' || currentMission.status === 'failed') && (
-                    <Button
-                      onClick={handleResumeMission}
-                      variant="outline"
-                      size="sm"
-                      className="text-xs"
-                    >
-                      <RotateCcw className="h-3 w-3 mr-1" />
-                      {currentMission.status === 'failed' ? 'Retry' : 'Resume'}
-                    </Button>
-                  )}
+                  {(currentMission.status === 'paused' || currentMission.status === 'stopped' || currentMission.status === 'failed') && (() => {
+                    // Check if at least one source is available
+                    // Use metadata if available (actual settings being used), otherwise fall back to tool_selection
+                    const hasWebSearch = currentMission.metadata?.use_web_search ??
+                                       currentMission.tool_selection?.web_search ?? false
+                    const hasDocumentGroup = (currentMission.metadata?.use_local_rag ||
+                                            currentMission.metadata?.document_group_id) ??
+                                          currentMission.tool_selection?.local_rag ?? false
+                    const hasSources = hasWebSearch || hasDocumentGroup
+
+                    return (
+                      <div className="flex items-center gap-2">
+                        <Button
+                          onClick={handleResumeMission}
+                          variant="outline"
+                          size="sm"
+                          className="text-xs"
+                          disabled={!hasSources}
+                          title={!hasSources ? 'Cannot resume: No information sources enabled. This should not happen as missions require sources to start.' : ''}
+                        >
+                          <RotateCcw className="h-3 w-3 mr-1" />
+                          {currentMission.status === 'failed' ? 'Retry' : 'Resume'}
+                        </Button>
+                        {!hasSources && (
+                          <span className="text-xs text-amber-600 dark:text-amber-400">
+                            ⚠️ No sources enabled
+                          </span>
+                        )}
+                      </div>
+                    )
+                  })()}
                   
                   {/* Completed state: Show multiple actions */}
                   {currentMission.status === 'completed' && (

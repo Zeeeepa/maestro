@@ -14,6 +14,7 @@ interface DeleteConfirmationModalProps {
   isLoading?: boolean
   variant?: 'single' | 'bulk'
   count?: number
+  error?: string | null
 }
 
 export const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = ({
@@ -26,7 +27,8 @@ export const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = (
   itemType = 'item',
   isLoading = false,
   variant = 'single',
-  count = 1
+  count = 1,
+  error = null
 }) => {
   const getIcon = () => {
     switch (itemType) {
@@ -109,6 +111,23 @@ export const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = (
               </div>
             </div>
           </div>
+
+          {/* Error message */}
+          {error && (
+            <div className="rounded-lg bg-red-500/10 border border-red-500/30 p-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-red-600 dark:text-red-400">
+                    Error
+                  </p>
+                  <p className="text-sm text-red-600/90 dark:text-red-300/90 leading-relaxed">
+                    {error}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Footer with proper padding */}

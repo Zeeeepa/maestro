@@ -148,12 +148,16 @@ export const DocumentGroupSidebar: React.FC<DocumentGroupSidebarProps> = ({
   const handleDeleteClick = (groupId: string, groupName: string, e: React.MouseEvent) => {
     e.stopPropagation();
     setGroupToDelete({ id: groupId, name: groupName });
+    setError(null); // Clear any previous errors
     setDeleteModalOpen(true);
   };
 
   const handleDeleteConfirm = async () => {
     if (!groupToDelete) return;
-    
+
+    // Clear error before attempting deletion
+    setError(null);
+
     try {
       setIsDeleting(true);
       await deleteDocumentGroup(groupToDelete.id);
@@ -165,13 +169,15 @@ export const DocumentGroupSidebar: React.FC<DocumentGroupSidebarProps> = ({
       if (selectedGroup?.id === groupToDelete.id) {
         onSelectGroup(null);
       }
-      
+
       setDeleteModalOpen(false);
       setGroupToDelete(null);
       setError(null);
-    } catch (err) {
-      setError('Failed to delete document group.');
-      console.error(err);
+    } catch (err: any) {
+      // Extract error message from API response
+      const errorMessage = err?.response?.data?.detail || err?.message || 'Failed to delete document group.';
+      setError(errorMessage);
+      console.error('Delete error:', err);
     } finally {
       setIsDeleting(false);
     }
@@ -181,6 +187,7 @@ export const DocumentGroupSidebar: React.FC<DocumentGroupSidebarProps> = ({
     setDeleteModalOpen(false);
     setGroupToDelete(null);
     setIsDeleting(false);
+    setError(null); // Clear error when canceling
   };
 
   const handleGroupSelect = (group: DocumentGroupWithCount) => {
@@ -430,6 +437,7 @@ export const DocumentGroupSidebar: React.FC<DocumentGroupSidebarProps> = ({
         itemName={groupToDelete?.name}
         itemType="item"
         isLoading={isDeleting}
+        error={error}
       />
     </>
   );

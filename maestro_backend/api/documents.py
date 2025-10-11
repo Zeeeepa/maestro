@@ -698,10 +698,17 @@ def delete_document_group(
     """
     Delete a document group by its ID.
     """
-    success = crud.delete_document_group(db, group_id=group_id, user_id=current_user.id)
-    if not success:
-        raise HTTPException(status_code=404, detail="Document group not found")
-    return
+    try:
+        success = crud.delete_document_group(db, group_id=group_id, user_id=current_user.id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Document group not found")
+        return
+    except ValueError as e:
+        # Raised when document group has active missions
+        raise HTTPException(status_code=409, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error deleting document group {group_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete document group")
 
 @router.post("/document-groups/{group_id}/documents/{doc_id}", response_model=schemas.DocumentGroup)
 def add_document_to_group(

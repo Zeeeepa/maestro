@@ -623,7 +623,7 @@ async def get_mission_status(
         tool_selection = mission_context.metadata.get("tool_selection") if mission_context.metadata else None
         document_group_id = mission_context.metadata.get("document_group_id") if mission_context.metadata else None
         generated_document_group_id = mission_context.metadata.get("generated_document_group_id") if mission_context.metadata else None
-        
+
         return MissionStatus(
             mission_id=mission_id,
             status=mission_context.status,
@@ -631,7 +631,8 @@ async def get_mission_status(
             error_info=mission_context.error_info,
             tool_selection=tool_selection,
             document_group_id=document_group_id,
-            generated_document_group_id=generated_document_group_id
+            generated_document_group_id=generated_document_group_id,
+            metadata=mission_context.metadata  # Return full metadata for complete settings visibility
         )
     except HTTPException:
         raise
@@ -2358,17 +2359,64 @@ async def start_mission_execution(
             existing_metadata["research_params"] = current_research_params
             existing_metadata["settings_captured_at_start"] = True
             existing_metadata["start_time_capture"] = datetime.now().isoformat()
+            existing_metadata["start_method"] = "chat_command"  # Indicates started via chat
 
-            # Update comprehensive_settings if it exists
-            if "comprehensive_settings" in existing_metadata:
-                existing_metadata["comprehensive_settings"]["research_params"] = current_research_params
-                existing_metadata["comprehensive_settings"]["settings_captured_at_start"] = True
-                existing_metadata["comprehensive_settings"]["start_time_capture"] = datetime.now().isoformat()
+        # CRITICAL: Update comprehensive_settings with ACTUAL settings being used at START time
+        # This ensures the Settings panel shows what's actually being used, not what was set at creation
+        if "comprehensive_settings" not in existing_metadata:
+            existing_metadata["comprehensive_settings"] = {}
 
-        # Store the updated metadata if anything changed (chat settings or research params)
-        if current_research_params or settings_updated:
-            await context_mgr.update_mission_metadata(mission_id, existing_metadata)
-            logger.info(f"Updated mission {mission_id} with current settings from chat at start time")
+        # Update ALL settings in comprehensive_settings to reflect what's actually being used
+        existing_metadata["comprehensive_settings"]["use_web_search"] = existing_metadata.get("use_web_search", False)
+        existing_metadata["comprehensive_settings"]["use_local_rag"] = existing_metadata.get("use_local_rag", False)
+        existing_metadata["comprehensive_settings"]["document_group_id"] = existing_metadata.get("document_group_id")
+        existing_metadata["comprehensive_settings"]["auto_create_document_group"] = current_research_params.get("auto_create_document_group", False) if current_research_params else False
+
+        # Get document group name if we have an ID
+        if existing_metadata.get("document_group_id"):
+            try:
+                doc_group = crud.get_document_group(db, group_id=existing_metadata["document_group_id"], user_id=current_user.id)
+                if doc_group:
+                    existing_metadata["comprehensive_settings"]["document_group_name"] = doc_group.name
+                    existing_metadata["document_group_name"] = doc_group.name  # Also update at top level
+                    logger.info(f"Found document group name: {doc_group.name}")
+            except Exception as e:
+                logger.warning(f"Could not get document group name: {e}")
+
+        # Update research params in comprehensive_settings
+        if current_research_params:
+            existing_metadata["comprehensive_settings"]["research_params"] = current_research_params
+            existing_metadata["comprehensive_settings"]["settings_captured_at_start"] = True
+            existing_metadata["comprehensive_settings"]["start_time_capture"] = datetime.now().isoformat()
+            existing_metadata["comprehensive_settings"]["start_method"] = "chat_command"
+
+        # Update tool_selection to match actual settings being used
+        existing_metadata["tool_selection"] = {
+            "web_search": existing_metadata.get("use_web_search", False),
+            "local_rag": existing_metadata.get("use_local_rag", False)
+        }
+
+        # Log what we're storing
+        logger.info(f"Updating comprehensive_settings at START time with: Web Search={existing_metadata['comprehensive_settings']['use_web_search']}, "
+                   f"Local RAG={existing_metadata['comprehensive_settings']['use_local_rag']}, "
+                   f"Doc Group={existing_metadata['comprehensive_settings']['document_group_id']}")
+
+        # Store the updated metadata - ALWAYS update to ensure comprehensive_settings reflects actual start-time settings
+        await context_mgr.update_mission_metadata(mission_id, existing_metadata)
+        logger.info(f"Updated mission {mission_id} with ACTUAL settings being used at start time")
+
+        # CRITICAL VALIDATION: Ensure at least one information source is enabled
+        final_use_web_search = existing_metadata.get("use_web_search", False)
+        final_use_local_rag = existing_metadata.get("use_local_rag", False)
+        final_document_group_id = existing_metadata.get("document_group_id")
+
+        logger.info(f"Final settings check - Web Search: {final_use_web_search}, Local RAG: {final_use_local_rag}, Doc Group: {final_document_group_id}")
+
+        if not final_use_web_search and not final_use_local_rag:
+            raise HTTPException(
+                status_code=422,
+                detail="Cannot start mission: At least one information source must be enabled (Web Search or Document Group). Please configure your sources before starting."
+            )
 
         # Allow starting from 'pending' or 'stopped' states
         if mission_context.status not in ["pending", "stopped", "planning"]:

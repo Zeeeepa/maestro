@@ -62,27 +62,37 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ missionId }) => {
   const [isLoading, setIsLoading] = useState(true)
   const { missions } = useMissionStore()
   const { activeChat } = useChatStore()
-  
+
   const mission = missions.find(m => m.id === missionId)
 
-  useEffect(() => {
-    const fetchSettings = async () => {
-      if (!missionId) return
-      
-      setIsLoading(true)
-      try {
-        // Fetch comprehensive mission settings
-        const response = await apiClient.get(`/api/missions/${missionId}/comprehensive-settings`)
-        setSettings(response.data)
-      } catch (error) {
-        console.error('Failed to fetch mission settings:', error)
-      } finally {
-        setIsLoading(false)
-      }
-    }
+  const fetchSettings = async () => {
+    if (!missionId) return
 
+    setIsLoading(true)
+    try {
+      // Fetch comprehensive mission settings
+      const response = await apiClient.get(`/api/missions/${missionId}/comprehensive-settings`)
+      setSettings(response.data)
+    } catch (error) {
+      console.error('Failed to fetch mission settings:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Fetch settings on mount and when missionId changes
+  useEffect(() => {
     fetchSettings()
   }, [missionId])
+
+  // Re-fetch settings when mission status changes to "running" (i.e., when mission actually starts)
+  // This ensures we get the ACTUAL settings being used, not the ones from chat creation
+  useEffect(() => {
+    if (mission?.status === 'running' || mission?.status === 'completed') {
+      console.log(`Mission status is ${mission.status}, re-fetching settings to get actual values`)
+      fetchSettings()
+    }
+  }, [mission?.status, missionId])
 
   if (isLoading) {
     return (
@@ -130,16 +140,28 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ missionId }) => {
 
   return (
     <div className="space-y-4 p-4 overflow-y-auto max-h-full">
-      {/* Mission Creation Settings */}
+      {/* Info Banner */}
+      {settings?.comprehensive_settings?.settings_captured_at_start && (
+        <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 text-xs">
+          <div className="flex items-center gap-2">
+            <Clock className="h-3.5 w-3.5 text-blue-500" />
+            <span className="text-blue-600 dark:text-blue-400">
+              These settings were captured when the mission was started, not when it was created.
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Mission Start Settings - Shows actual settings used when mission started */}
       {settings?.comprehensive_settings && (
         <Card className="border-primary/20">
           <CardHeader className="pb-3 bg-primary/5">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <Clock className="h-4 w-4" />
-              Mission Creation Settings
-              {settings.comprehensive_settings.settings_captured_at && (
+              Mission Start Settings
+              {(settings.comprehensive_settings.start_time_capture || settings.comprehensive_settings.settings_captured_at) && (
                 <span className="text-xs text-muted-foreground ml-auto">
-                  {new Date(settings.comprehensive_settings.settings_captured_at).toLocaleString()}
+                  {new Date(settings.comprehensive_settings.start_time_capture || settings.comprehensive_settings.settings_captured_at).toLocaleString()}
                 </span>
               )}
             </CardTitle>
@@ -185,7 +207,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ missionId }) => {
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <Brain className="h-4 w-4" />
-              AI Models (At Mission Creation)
+              AI Models (At Mission Start)
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">

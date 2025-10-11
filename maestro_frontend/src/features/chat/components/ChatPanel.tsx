@@ -189,14 +189,21 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ chatId: propChatId }) => {
       
       let autoSaveDocs = false
       
-      if (activeMission?.tool_selection) {
+      if (activeMission?.metadata || activeMission?.tool_selection) {
         // Use mission settings if available (takes priority)
-        console.log('Using mission tool_selection:', activeMission.tool_selection)
-        groupId = activeMission.document_group_id || null
-        webSearch = activeMission.tool_selection.web_search ?? true
-        // For now, we can't get auto_create_document_group from mission since metadata isn't exposed
-        // Fall back to chat settings for this
-        autoSaveDocs = currentChat.settings?.auto_create_document_group ?? false
+        // First check metadata (full settings), then fall back to tool_selection
+        if (activeMission.metadata) {
+          console.log('Using mission metadata:', activeMission.metadata)
+          groupId = activeMission.metadata.document_group_id || null
+          webSearch = activeMission.metadata.use_web_search ?? true
+          autoSaveDocs = activeMission.metadata.auto_create_document_group ?? false
+        } else if (activeMission.tool_selection) {
+          console.log('Using mission tool_selection:', activeMission.tool_selection)
+          groupId = activeMission.document_group_id || null
+          webSearch = activeMission.tool_selection.web_search ?? true
+          // Fall back to chat settings for auto_create_document_group
+          autoSaveDocs = currentChat.settings?.auto_create_document_group ?? false
+        }
       } else {
         // Fall back to chat settings
         groupId = currentChat.settings?.document_group_id || null
@@ -224,15 +231,20 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ chatId: propChatId }) => {
     }, 200)
   }, [currentChat?.id, currentChat?.missionId]) // Removed missions from dependencies to prevent constant reloads
 
-  // Watch for mission tool_selection changes only for the current mission
+  // Watch for mission metadata/tool_selection changes only for the current mission
   useEffect(() => {
     if (currentChat?.missionId) {
       const activeMission = missions.find(m => m.id === currentChat.missionId)
-      if (activeMission?.tool_selection) {
+      if (activeMission?.metadata || activeMission?.tool_selection) {
+        // Use metadata if available, otherwise fall back to tool_selection
+        const settings = activeMission.metadata || activeMission.tool_selection || {}
+        const missionMetadata = activeMission.metadata || {}
+
         // Only update if settings have actually changed
-        const newGroupId = activeMission.document_group_id || null
-        const newWebSearch = activeMission.tool_selection.web_search ?? true
-        
+        const newGroupId = missionMetadata.document_group_id || activeMission.document_group_id || null
+        const newWebSearch = missionMetadata.use_web_search ?? settings.web_search ?? true
+        const newAutoSaveDocs = missionMetadata.auto_create_document_group ?? false
+
         setSelectedGroupId(prevGroupId => {
           if (prevGroupId !== newGroupId) {
             console.log('Mission document group changed:', newGroupId)
@@ -240,13 +252,21 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ chatId: propChatId }) => {
           }
           return prevGroupId
         })
-        
+
         setUseWebSearch(prevWebSearch => {
           if (prevWebSearch !== newWebSearch) {
             console.log('Mission web search changed:', newWebSearch)
             return newWebSearch
           }
           return prevWebSearch
+        })
+
+        setAutoCreateDocumentGroup(prevAutoSave => {
+          if (prevAutoSave !== newAutoSaveDocs) {
+            console.log('Mission auto-save docs changed:', newAutoSaveDocs)
+            return newAutoSaveDocs
+          }
+          return prevAutoSave
         })
       }
     }

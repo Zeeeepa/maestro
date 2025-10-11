@@ -253,6 +253,7 @@ class MissionStatus(BaseModel):
     tool_selection: Optional[Dict[str, Any]] = None
     document_group_id: Optional[str] = None
     generated_document_group_id: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None  # Full mission metadata including all settings
 
     class Config:
         json_encoders = {
