@@ -5,6 +5,7 @@ from pydantic import BaseModel
 import logging
 import asyncio
 import queue
+from datetime import datetime
 
 from auth.dependencies import get_current_user_from_cookie, get_db
 from database.models import User
@@ -379,11 +380,37 @@ async def approve_research_questions(
             final_questions=request.final_questions,
             tool_selection=request.tool_selection
         )
-        
+
         if success:
+            # CRITICAL: Update comprehensive_settings when mission is started via chat
+            # This ensures settings panel shows actual settings being used
+            mission_context = agent_controller.context_manager.get_mission_context(request.mission_id)
+            if mission_context and mission_context.metadata:
+                existing_metadata = mission_context.metadata.copy()
+
+                # Update comprehensive_settings to reflect actual settings at start time
+                if "comprehensive_settings" not in existing_metadata:
+                    existing_metadata["comprehensive_settings"] = {}
+
+                # Update settings based on tool_selection
+                existing_metadata["comprehensive_settings"]["use_web_search"] = request.tool_selection.get("web_search", False)
+                existing_metadata["comprehensive_settings"]["use_local_rag"] = request.tool_selection.get("local_rag", False)
+                existing_metadata["comprehensive_settings"]["settings_captured_at_start"] = True
+                existing_metadata["comprehensive_settings"]["start_time_capture"] = datetime.now().isoformat()
+                existing_metadata["comprehensive_settings"]["start_method"] = "chat_approve"  # Indicates started via chat approval
+
+                # Also update top-level metadata for consistency
+                existing_metadata["use_web_search"] = request.tool_selection.get("web_search", False)
+                existing_metadata["use_local_rag"] = request.tool_selection.get("local_rag", False)
+                existing_metadata["tool_selection"] = request.tool_selection
+
+                # Store the updated metadata
+                await agent_controller.context_manager.update_mission_metadata(request.mission_id, existing_metadata)
+                logger.info(f"Updated comprehensive_settings for mission {request.mission_id} started via chat approval")
+
             # Update mission status to indicate research is starting
             await agent_controller.context_manager.update_mission_status(
-                request.mission_id, 
+                request.mission_id,
                 "planning"
             )
             
