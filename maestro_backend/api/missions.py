@@ -2690,75 +2690,36 @@ async def start_mission_execution(
                     except Exception as e:
                         logger.error(f"Error in websocket_update_callback for mission {mission_id}: {e}")
                 
-                # Create document group if auto_create_document_group is enabled
-                # Check both current_research_params and mission metadata for the flag
+                # Use the shared mission service to prepare the mission
+                from services.mission_service import prepare_mission_start
+
+                # Get metadata settings for preparation
                 mission_metadata = mission_context.metadata or {}
                 mission_research_params = mission_metadata.get("research_params", {})
+
+                # Determine auto_create_document_group flag
                 auto_create_flag = (
                     (current_research_params and current_research_params.get("auto_create_document_group")) or
-                    mission_research_params.get("auto_create_document_group")
+                    mission_research_params.get("auto_create_document_group") or
+                    mission_metadata.get("auto_create_document_group", False)
                 )
-                logger.info(f"Checking auto_create_document_group for mission {mission_id}: current_params={current_research_params}, mission_params={mission_research_params}, flag={auto_create_flag}")
-                if auto_create_flag:
-                    logger.info(f"auto_create_document_group is enabled for mission {mission_id}, creating document group...")
-                    
-                    # Get database session
-                    db = next(get_db())
-                    try:
-                        # Get the mission's chat
-                        mission_db = crud.get_mission(db, mission_id=mission_id, user_id=current_user.id)
-                        chat_db = crud.get_chat(db, chat_id=mission_db.chat_id, user_id=current_user.id) if mission_db else None
-                        
-                        # Create a new document group with concise name
-                        # Extract first meaningful part of request for concise name
-                        request_words = mission_context.user_request.split()[:5]  # First 5 words
-                        concise_request = " ".join(request_words)
-                        if len(mission_context.user_request.split()) > 5:
-                            concise_request += "..."
-                        group_name = f"Research: {concise_request}"
-                        group_id = str(uuid.uuid4())
-                        document_group = crud.create_document_group(
-                            db=db,
-                            group_id=group_id,
-                            user_id=current_user.id,
-                            name=group_name,
-                            description=f"Auto-generated documents from research: {mission_context.user_request}"
-                        )
-                        
-                        # Update document group with mission reference
-                        document_group.source_mission_id = mission_id
-                        document_group.auto_generated = True
-                        
-                        # Store the document group ID in the mission
-                        mission_db.generated_document_group_id = group_id
-                        
-                        # Also link the document group to the chat if it exists
-                        if chat_db:
-                            chat_db.document_group_id = group_id
-                        
-                        db.commit()
-                        
-                        # Update mission metadata to include the document group ID
-                        await context_mgr.update_mission_metadata(mission_id, {
-                            "generated_document_group_id": group_id,
-                            "generated_document_group_name": group_name
-                        })
-                        
-                        logger.info(f"Created auto document group {group_id} for mission {mission_id}")
-                        
-                        # Log to frontend
-                        await context_mgr.log_execution_step(
-                            mission_id=mission_id,
-                            agent_name="System",
-                            action="Document Group Created",
-                            output_summary=f"Auto-created document group '{group_name}' for collecting research documents.",
-                            status="success"
-                        )
-                    except Exception as e:
-                        logger.error(f"Failed to create auto document group for mission {mission_id}: {e}")
-                        # Continue without document group - this shouldn't block the mission
-                    finally:
-                        db.close()
+
+                # Prepare settings for the shared function
+                mission_settings = {
+                    "use_web_search": mission_metadata.get("use_web_search", True),
+                    "document_group_id": mission_metadata.get("document_group_id"),
+                    "auto_create_document_group": auto_create_flag,
+                    "current_research_params": current_research_params
+                }
+
+                # Call the shared preparation function
+                updated_settings = await prepare_mission_start(
+                    mission_id=mission_id,
+                    mission_context=mission_context,
+                    context_mgr=context_mgr,
+                    settings=mission_settings,
+                    log_to_frontend=True
+                )
                 
                 # Run the actual mission
                 logger.info(f"Starting main mission execution for {mission_id}")

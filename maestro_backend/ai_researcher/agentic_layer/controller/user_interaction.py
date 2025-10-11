@@ -617,79 +617,54 @@ Output ONLY a single JSON object conforming EXACTLY to the RequestAnalysisOutput
                 
                 # Update mission status to indicate research is starting
                 await self.controller.context_manager.update_mission_status(mission_id, "planning")
-                
-                # IMPORTANT: Capture user's current settings at the time of starting the research
-                # This ensures we use the most recent settings when research is triggered via chat
-                try:
-                    from ai_researcher.user_context import get_current_user
-                    from database.database import SessionLocal
-                    from database import crud
-                    import json
-                    from datetime import datetime
-                    
-                    current_user = get_current_user()
-                    if current_user:
-                        logger.info(f"Capturing current user settings for mission {mission_id} at chat-based research start")
-                        
+
+                # Use the shared mission service to prepare the mission
+                from services.mission_service import prepare_mission_start
+                from ai_researcher.user_context import get_current_user
+                from database.database import SessionLocal
+                from database import models
+                import json
+
+                # Get current user's research parameters
+                current_research_params = {}
+                current_user = get_current_user()
+                if current_user:
+                    try:
                         with SessionLocal() as db:
-                            from database import models
                             db_user = db.query(models.User).filter(models.User.id == current_user.id).first()
                             if db_user and db_user.settings:
                                 settings_dict = json.loads(db_user.settings) if isinstance(db_user.settings, str) else db_user.settings
-                                # The settings are stored under "research_parameters" in the user settings
                                 research_settings = settings_dict.get("research_parameters", {})
-                                
-                                # Extract research parameters from user's current settings
-                                current_research_params = {
-                                    "initial_research_max_depth": research_settings.get("initial_research_max_depth"),
-                                    "initial_research_max_questions": research_settings.get("initial_research_max_questions"),
-                                    "structured_research_rounds": research_settings.get("structured_research_rounds"),
-                                    "writing_passes": research_settings.get("writing_passes"),
-                                    "initial_exploration_doc_results": research_settings.get("initial_exploration_doc_results"),
-                                    "initial_exploration_web_results": research_settings.get("initial_exploration_web_results"),
-                                    "main_research_doc_results": research_settings.get("main_research_doc_results"),
-                                    "main_research_web_results": research_settings.get("main_research_web_results"),
-                                    "thought_pad_context_limit": research_settings.get("thought_pad_context_limit"),
-                                    "max_notes_for_assignment_reranking": research_settings.get("max_notes_for_assignment_reranking"),
-                                    "max_concurrent_requests": research_settings.get("max_concurrent_requests"),
-                                    "skip_final_replanning": research_settings.get("skip_final_replanning"),
-                                    "max_research_cycles_per_section": research_settings.get("max_research_cycles_per_section"),
-                                    "max_total_iterations": research_settings.get("max_total_iterations"),
-                                    "max_total_depth": research_settings.get("max_total_depth"),
-                                    "min_notes_per_section_assignment": research_settings.get("min_notes_per_section_assignment"),
-                                    "max_notes_per_section_assignment": research_settings.get("max_notes_per_section_assignment"),
-                                    "max_planning_context_chars": research_settings.get("max_planning_context_chars"),
-                                    "writing_previous_content_preview_chars": research_settings.get("writing_previous_content_preview_chars"),
-                                    "max_suggestions_per_batch": research_settings.get("max_suggestions_per_batch"),
-                                }
-                                
-                                # Remove None values
-                                current_research_params = {k: v for k, v in current_research_params.items() if v is not None}
-                                
-                                if current_research_params:
-                                    # Get existing metadata
-                                    existing_metadata = mission_context.metadata or {}
-                                    
-                                    # Update research_params with current settings
-                                    existing_metadata["research_params"] = current_research_params
-                                    existing_metadata["settings_captured_at_start"] = True
-                                    existing_metadata["start_time_capture"] = datetime.now().isoformat()
-                                    existing_metadata["start_method"] = "chat_command"
-                                    
-                                    # Update comprehensive_settings if it exists
-                                    if "comprehensive_settings" in existing_metadata:
-                                        existing_metadata["comprehensive_settings"]["research_params"] = current_research_params
-                                        existing_metadata["comprehensive_settings"]["settings_captured_at_start"] = True
-                                        existing_metadata["comprehensive_settings"]["start_time_capture"] = datetime.now().isoformat()
-                                        existing_metadata["comprehensive_settings"]["start_method"] = "chat_command"
-                                    
-                                    # Store the updated metadata
-                                    await self.controller.context_manager.update_mission_metadata(mission_id, existing_metadata)
-                                    logger.info(f"Updated mission {mission_id} with {len(current_research_params)} research settings captured at chat start time")
-                
-                except Exception as settings_error:
-                    logger.warning(f"Failed to capture current settings for mission {mission_id}: {settings_error}")
-                    # Continue without settings capture - don't fail the research start
+
+                                # Extract research parameters
+                                current_research_params = {k: v for k, v in research_settings.items() if v is not None}
+                                logger.info(f"Retrieved {len(current_research_params)} research parameters for mission {mission_id}")
+                    except Exception as e:
+                        logger.warning(f"Failed to get user research parameters: {e}")
+
+                # Prepare settings for the shared function
+                mission_settings = {
+                    "use_web_search": use_web_search,
+                    "document_group_id": document_group_id,
+                    "auto_create_document_group": auto_create_document_group,
+                    "current_research_params": current_research_params
+                }
+
+                # Call the shared preparation function
+                updated_settings = await prepare_mission_start(
+                    mission_id=mission_id,
+                    mission_context=mission_context,
+                    context_mgr=self.controller.context_manager,
+                    settings=mission_settings,
+                    log_to_frontend=True
+                )
+
+                # Update local variables with any changes from the preparation
+                if updated_settings.get("document_group_id"):
+                    document_group_id = updated_settings["document_group_id"]
+                    tool_selection = updated_settings["tool_selection"]
+
+                # Note: Settings capture is now handled by the shared prepare_mission_start function
                 
                 # Apply auto-optimization logic with comprehensive logging
                 try:
