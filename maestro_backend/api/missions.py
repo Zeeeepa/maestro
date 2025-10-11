@@ -2208,89 +2208,167 @@ async def start_mission_execution(
         if not mission_context:
             raise HTTPException(status_code=404, detail="Mission not found")
         
-        # IMPORTANT: Capture user's current settings at the time of starting the research
-        # This ensures we use the most recent settings, not what was stored at mission creation
-        logger.info(f"Capturing current user settings for mission {mission_id} at research start time")
-        
-        # Get user's current research parameters
+        # IMPORTANT: Read settings with correct priority:
+        # 1. Mission-specific settings (from Settings dialog) - HIGHEST PRIORITY
+        # 2. Chat settings (from chat UI controls) - MEDIUM PRIORITY
+        # 3. Global user settings - LOWEST PRIORITY (fallback defaults)
+        logger.info(f"Reading settings for mission {mission_id} with priority: Mission > Chat > Global")
+
+        # First, get mission-specific settings if they exist
+        existing_metadata = mission_context.metadata or {}
+        mission_specific_settings = existing_metadata.get("mission_settings", {})
+
+        if mission_specific_settings:
+            logger.info(f"Found mission-specific settings: {list(mission_specific_settings.keys())}")
+
+        # Get global user settings as fallback
         async_db = await get_async_db_session()
         try:
             user_settings = await async_crud.get_user_settings(async_db, current_user.id)
         finally:
             await async_db.close()
-        current_research_params = None
+
+        # Parse global settings
+        global_research_settings = {}
         if user_settings:
-            # user_settings is already a dict from get_user_settings
             settings_dict = json.loads(user_settings) if isinstance(user_settings, str) else user_settings
-            # Fixed: Use "research_parameters" not "research" to match the actual settings structure
-            research_settings = settings_dict.get("research_parameters", {})
-            
-            # Extract research parameters from user's current settings
-            current_research_params = {
-                "initial_research_max_depth": research_settings.get("initial_research_max_depth"),
-                "initial_research_max_questions": research_settings.get("initial_research_max_questions"),
-                "structured_research_rounds": research_settings.get("structured_research_rounds"),
-                "writing_passes": research_settings.get("writing_passes"),
-                "initial_exploration_doc_results": research_settings.get("initial_exploration_doc_results"),
-                "initial_exploration_web_results": research_settings.get("initial_exploration_web_results"),
-                "main_research_doc_results": research_settings.get("main_research_doc_results"),
-                "main_research_web_results": research_settings.get("main_research_web_results"),
-                "thought_pad_context_limit": research_settings.get("thought_pad_context_limit"),
-                "max_notes_for_assignment_reranking": research_settings.get("max_notes_for_assignment_reranking"),
-                "max_concurrent_requests": research_settings.get("max_concurrent_requests"),
-                "skip_final_replanning": research_settings.get("skip_final_replanning"),
-                "auto_create_document_group": research_settings.get("auto_create_document_group"),
-                "max_research_cycles_per_section": research_settings.get("max_research_cycles_per_section"),
-                "max_total_iterations": research_settings.get("max_total_iterations"),
-                "max_total_depth": research_settings.get("max_total_depth"),
-                "min_notes_per_section_assignment": research_settings.get("min_notes_per_section_assignment"),
-                "max_notes_per_section_assignment": research_settings.get("max_notes_per_section_assignment"),
-                "max_planning_context_chars": research_settings.get("max_planning_context_chars"),
-                "writing_previous_content_preview_chars": research_settings.get("writing_previous_content_preview_chars"),
-                "max_suggestions_per_batch": research_settings.get("max_suggestions_per_batch"),
-            }
-            
-            # Remove None values
-            current_research_params = {k: v for k, v in current_research_params.items() if v is not None}
-            
-            logger.info(f"Captured {len(current_research_params)} research parameters from user settings at start time")
+            global_research_settings = settings_dict.get("research_parameters", {})
+
+        # Helper function to get setting with priority: Mission > Chat > Global
+        def get_setting_with_priority(setting_name):
+            # Priority 1: Mission-specific settings
+            if setting_name in mission_specific_settings:
+                value = mission_specific_settings.get(setting_name)
+                if value is not None:
+                    logger.debug(f"Using mission-specific value for {setting_name}: {value}")
+                    return value
+
+            # Priority 2: Chat settings (not applicable for research params, only for web_search/doc_group)
+            # (We'll handle chat settings separately below)
+
+            # Priority 3: Global user settings
+            value = global_research_settings.get(setting_name)
+            if value is not None:
+                logger.debug(f"Using global value for {setting_name}: {value}")
+            return value
+
+        # Build research params using priority system
+        current_research_params = {
+            "initial_research_max_depth": get_setting_with_priority("initial_research_max_depth"),
+            "initial_research_max_questions": get_setting_with_priority("initial_research_max_questions"),
+            "structured_research_rounds": get_setting_with_priority("structured_research_rounds"),
+            "writing_passes": get_setting_with_priority("writing_passes"),
+            "initial_exploration_doc_results": get_setting_with_priority("initial_exploration_doc_results"),
+            "initial_exploration_web_results": get_setting_with_priority("initial_exploration_web_results"),
+            "main_research_doc_results": get_setting_with_priority("main_research_doc_results"),
+            "main_research_web_results": get_setting_with_priority("main_research_web_results"),
+            "thought_pad_context_limit": get_setting_with_priority("thought_pad_context_limit"),
+            "max_notes_for_assignment_reranking": get_setting_with_priority("max_notes_for_assignment_reranking"),
+            "max_concurrent_requests": get_setting_with_priority("max_concurrent_requests"),
+            "skip_final_replanning": get_setting_with_priority("skip_final_replanning"),
+            "auto_create_document_group": get_setting_with_priority("auto_create_document_group"),
+            "max_research_cycles_per_section": get_setting_with_priority("max_research_cycles_per_section"),
+            "max_total_iterations": get_setting_with_priority("max_total_iterations"),
+            "max_total_depth": get_setting_with_priority("max_total_depth"),
+            "min_notes_per_section_assignment": get_setting_with_priority("min_notes_per_section_assignment"),
+            "max_notes_per_section_assignment": get_setting_with_priority("max_notes_per_section_assignment"),
+            "max_planning_context_chars": get_setting_with_priority("max_planning_context_chars"),
+            "writing_previous_content_preview_chars": get_setting_with_priority("writing_previous_content_preview_chars"),
+            "max_suggestions_per_batch": get_setting_with_priority("max_suggestions_per_batch"),
+        }
+
+        # Remove None values
+        current_research_params = {k: v for k, v in current_research_params.items() if v is not None}
+
+        logger.info(f"Merged {len(current_research_params)} research parameters using priority system")
         
         # Get the chat's current settings to use for this mission start
         # This ensures we use the settings the user just configured, not old ones
         mission_db = crud.get_mission(db, mission_id=mission_id, user_id=current_user.id)
+        chat_use_web_search = None
+        chat_document_group_id = None
+        chat_auto_save_docs = None
+
         if mission_db and mission_db.chat_id:
             chat_db = crud.get_chat(db, chat_id=mission_db.chat_id, user_id=current_user.id)
             if chat_db and chat_db.settings:
                 chat_settings = chat_db.settings
                 logger.info(f"Reading chat settings for mission {mission_id}: {chat_settings}")
 
-                # Override auto_create_document_group from chat settings
-                if "auto_create_document_group" in chat_settings:
+                # Read all settings from chat
+                chat_use_web_search = chat_settings.get("use_web_search")
+                chat_document_group_id = chat_settings.get("document_group_id")
+                chat_auto_save_docs = chat_settings.get("auto_create_document_group")
+
+                logger.info(f"Chat settings - Web Search: {chat_use_web_search}, Doc Group: {chat_document_group_id}, Auto-save: {chat_auto_save_docs}")
+
+                # Override auto_create_document_group from chat settings ONLY if not in mission-specific settings
+                # Priority: Mission > Chat > Global
+                if chat_auto_save_docs is not None and "auto_create_document_group" not in mission_specific_settings:
                     # Initialize current_research_params if it's None
                     if current_research_params is None:
                         current_research_params = {}
-                    current_research_params["auto_create_document_group"] = chat_settings["auto_create_document_group"]
-                    logger.info(f"Using auto_create_document_group from chat settings: {chat_settings['auto_create_document_group']}")
+                    current_research_params["auto_create_document_group"] = chat_auto_save_docs
+                    logger.info(f"Using auto_create_document_group from chat settings: {chat_auto_save_docs}")
+                elif "auto_create_document_group" in mission_specific_settings:
+                    logger.info(f"Mission-specific auto_create_document_group takes priority over chat setting")
 
-        # Update mission with current settings if they exist
+        # Update mission metadata with chat settings (existing_metadata already defined earlier)
+        # Priority: Mission-specific > Chat > Existing metadata
+        settings_updated = False
+
+        # Apply chat settings ONLY if not overridden by mission-specific settings
+        if chat_db and chat_db.settings:
+            # Update web search setting (Priority: Mission > Chat)
+            if chat_use_web_search is not None and "use_web_search" not in mission_specific_settings:
+                existing_metadata["use_web_search"] = chat_use_web_search
+                logger.info(f"Updated use_web_search from chat to: {chat_use_web_search}")
+                settings_updated = True
+            elif "use_web_search" in mission_specific_settings:
+                # Use mission-specific value
+                existing_metadata["use_web_search"] = mission_specific_settings["use_web_search"]
+                logger.info(f"Using mission-specific use_web_search: {mission_specific_settings['use_web_search']}")
+                settings_updated = True
+
+            # Update document group setting (Priority: Mission > Chat)
+            if "document_group_id" in chat_db.settings and "document_group_id" not in mission_specific_settings:
+                if chat_document_group_id:
+                    existing_metadata["document_group_id"] = chat_document_group_id
+                    existing_metadata["use_local_rag"] = True
+                    logger.info(f"Updated document_group_id from chat to: {chat_document_group_id}")
+                else:
+                    # User explicitly set to None (removed document group)
+                    existing_metadata["document_group_id"] = None
+                    existing_metadata["use_local_rag"] = False
+                    logger.info("Cleared document_group_id from chat (user removed it)")
+                settings_updated = True
+            elif "document_group_id" in mission_specific_settings:
+                # Use mission-specific value
+                doc_group_id = mission_specific_settings["document_group_id"]
+                existing_metadata["document_group_id"] = doc_group_id
+                existing_metadata["use_local_rag"] = doc_group_id is not None
+                logger.info(f"Using mission-specific document_group_id: {doc_group_id}")
+                settings_updated = True
+
+            if settings_updated:
+                logger.info(f"Applied settings to mission {mission_id} with proper priority (Mission > Chat)")
+
+        # Update research_params if they exist
         if current_research_params:
-            # Get existing metadata
-            existing_metadata = mission_context.metadata or {}
-
-            # Update research_params with current settings (no longer preserving old values)
             existing_metadata["research_params"] = current_research_params
             existing_metadata["settings_captured_at_start"] = True
             existing_metadata["start_time_capture"] = datetime.now().isoformat()
-            
+
             # Update comprehensive_settings if it exists
             if "comprehensive_settings" in existing_metadata:
                 existing_metadata["comprehensive_settings"]["research_params"] = current_research_params
                 existing_metadata["comprehensive_settings"]["settings_captured_at_start"] = True
                 existing_metadata["comprehensive_settings"]["start_time_capture"] = datetime.now().isoformat()
-            
-            # Store the updated metadata
+
+        # Store the updated metadata if anything changed (chat settings or research params)
+        if current_research_params or settings_updated:
             await context_mgr.update_mission_metadata(mission_id, existing_metadata)
-            logger.info(f"Updated mission {mission_id} with current research settings captured at start time")
+            logger.info(f"Updated mission {mission_id} with current settings from chat at start time")
 
         # Allow starting from 'pending' or 'stopped' states
         if mission_context.status not in ["pending", "stopped", "planning"]:
