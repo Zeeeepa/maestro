@@ -445,6 +445,8 @@ async def create_mission(
         auto_create_document_group = mission_data.get("auto_create_document_group", False)
         mission_settings_data = mission_data.get("mission_settings")
 
+        logger.info(f"Creating mission with settings - Web Search: {use_web_search}, Doc Group: {document_group_id}, Auto-save: {auto_create_document_group}")
+
         if not user_request or not chat_id:
             raise HTTPException(status_code=422, detail="Request and chat_id are required.")
 
@@ -531,7 +533,8 @@ async def create_mission(
             "document_group_id": document_group_id,
             "document_group_name": document_group_name,
             "use_web_search": use_web_search,
-            "use_local_rag": use_local_rag
+            "use_local_rag": use_local_rag,
+            "auto_create_document_group": auto_create_document_group  # CRITICAL: Store at top level for frontend to find
         }
         
         # Update mission metadata with all settings at once

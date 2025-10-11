@@ -204,7 +204,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ chatId: propChatId }) => {
                         activeMission.metadata.auto_create_document_group ??
                         false
 
-          console.log('Loaded from comprehensive_settings - AutoSave:', autoSaveDocs)
+          console.log('Mission settings load - comprehensive:', comprehensiveSettings.auto_create_document_group,
+                     'metadata:', activeMission.metadata.auto_create_document_group,
+                     'final:', autoSaveDocs)
         } else if (activeMission.tool_selection) {
           console.log('Using mission tool_selection:', activeMission.tool_selection)
           groupId = activeMission.document_group_id || null
@@ -244,40 +246,62 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ chatId: propChatId }) => {
     if (currentChat?.missionId) {
       const activeMission = missions.find(m => m.id === currentChat.missionId)
       if (activeMission?.metadata || activeMission?.tool_selection) {
-        // Use metadata if available, otherwise fall back to tool_selection
-        const settings = activeMission.metadata || activeMission.tool_selection || {}
-        const missionMetadata = activeMission.metadata || {}
-        const comprehensiveSettings = missionMetadata.comprehensive_settings || {}
+        // IMPORTANT: We should only update UI from mission metadata if it's a completed/running mission
+        // For new missions being created, we should NOT override the user's current settings
+        // Only sync from mission if it's actually running/completed (has been started)
+        if (activeMission.status !== 'pending' && activeMission.status !== 'planning') {
+          // Block settings updates while we're loading from mission
+          setIsLoadingSettings(true)
 
-        // Only update if settings have actually changed
-        // Priority: comprehensive_settings > metadata > tool_selection
-        const newGroupId = comprehensiveSettings.document_group_id ?? missionMetadata.document_group_id ?? activeMission.document_group_id ?? null
-        const newWebSearch = comprehensiveSettings.use_web_search ?? missionMetadata.use_web_search ?? settings.web_search ?? true
-        const newAutoSaveDocs = comprehensiveSettings.auto_create_document_group ?? missionMetadata.auto_create_document_group ?? false
+          // Use metadata if available, otherwise fall back to tool_selection
+          const settings = activeMission.metadata || activeMission.tool_selection || {}
+          const missionMetadata = activeMission.metadata || {}
+          const comprehensiveSettings = missionMetadata.comprehensive_settings || {}
 
-        setSelectedGroupId(prevGroupId => {
-          if (prevGroupId !== newGroupId) {
-            console.log('Mission document group changed:', newGroupId)
-            return newGroupId
+          // Only update if settings have actually changed
+          // Priority: comprehensive_settings > metadata > tool_selection
+          const newGroupId = comprehensiveSettings.document_group_id ?? missionMetadata.document_group_id ?? activeMission.document_group_id ?? null
+          const newWebSearch = comprehensiveSettings.use_web_search ?? missionMetadata.use_web_search ?? settings.web_search ?? true
+
+          // For auto-save, ONLY use it if it's explicitly set, don't default to false
+          let newAutoSaveDocs = autoCreateDocumentGroup // Keep current value by default
+          if (comprehensiveSettings.auto_create_document_group !== undefined) {
+            newAutoSaveDocs = comprehensiveSettings.auto_create_document_group
+          } else if (missionMetadata.auto_create_document_group !== undefined) {
+            newAutoSaveDocs = missionMetadata.auto_create_document_group
           }
-          return prevGroupId
-        })
 
-        setUseWebSearch(prevWebSearch => {
-          if (prevWebSearch !== newWebSearch) {
-            console.log('Mission web search changed:', newWebSearch)
-            return newWebSearch
-          }
-          return prevWebSearch
-        })
+          setSelectedGroupId(prevGroupId => {
+            if (prevGroupId !== newGroupId) {
+              console.log('Mission document group changed:', newGroupId)
+              return newGroupId
+            }
+            return prevGroupId
+          })
 
-        setAutoCreateDocumentGroup(prevAutoSave => {
-          if (prevAutoSave !== newAutoSaveDocs) {
-            console.log('Mission auto-save docs changed from', prevAutoSave, 'to', newAutoSaveDocs)
-            return newAutoSaveDocs
-          }
-          return prevAutoSave
-        })
+          setUseWebSearch(prevWebSearch => {
+            if (prevWebSearch !== newWebSearch) {
+              console.log('Mission web search changed:', newWebSearch)
+              return newWebSearch
+            }
+            return prevWebSearch
+          })
+
+          setAutoCreateDocumentGroup(prevAutoSave => {
+            if (prevAutoSave !== newAutoSaveDocs) {
+              console.log('Mission auto-save docs changed from', prevAutoSave, 'to', newAutoSaveDocs,
+                         'comprehensive:', comprehensiveSettings.auto_create_document_group,
+                         'metadata:', missionMetadata.auto_create_document_group)
+              return newAutoSaveDocs
+            }
+            return prevAutoSave
+          })
+
+          // Re-enable settings after a short delay
+          setTimeout(() => {
+            setIsLoadingSettings(false)
+          }, 100)
+        }
       }
     }
   }, [currentChat?.missionId, missions])

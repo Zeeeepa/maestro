@@ -81,7 +81,7 @@ async def chat_with_ai(
         logger.info(f"Processing chat request from user {current_user.username} with {len(chat_history)} history pairs")
         
         # Save chat settings if provided
-        if request.chat_id and (request.document_group_id is not None or request.use_web_search is not None):
+        if request.chat_id and (request.document_group_id is not None or request.use_web_search is not None or request.auto_create_document_group is not None):
             from database import crud
             try:
                 settings = {}
@@ -89,7 +89,9 @@ async def chat_with_ai(
                     settings['document_group_id'] = request.document_group_id
                 if request.use_web_search is not None:
                     settings['use_web_search'] = request.use_web_search
-                
+                if request.auto_create_document_group is not None:
+                    settings['auto_create_document_group'] = request.auto_create_document_group
+
                 crud.update_chat_settings(
                     db=db,
                     chat_id=request.chat_id,

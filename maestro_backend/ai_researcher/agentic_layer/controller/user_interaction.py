@@ -367,6 +367,9 @@ Output ONLY a single JSON object conforming EXACTLY to the RequestAnalysisOutput
                     existing_metadata.update({
                         "tool_selection": tool_selection,
                         "document_group_id": document_group_id,
+                        "use_web_search": use_web_search,
+                        "use_local_rag": document_group_id is not None,
+                        "auto_create_document_group": auto_create_document_group,  # CRITICAL: Store at top level for frontend
                         "research_params": {
                             "auto_create_document_group": auto_create_document_group
                         },
@@ -423,6 +426,9 @@ Output ONLY a single JSON object conforming EXACTLY to the RequestAnalysisOutput
                     await self.controller.context_manager.update_mission_metadata(mission_id, {
                         "tool_selection": tool_selection,
                         "document_group_id": document_group_id,
+                        "use_web_search": use_web_search,
+                        "use_local_rag": document_group_id is not None,
+                        "auto_create_document_group": auto_create_document_group,  # CRITICAL: Store at top level for frontend
                         "research_params": {
                             "auto_create_document_group": auto_create_document_group
                         },
