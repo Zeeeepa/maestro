@@ -395,6 +395,14 @@ async def approve_research_questions(
                 # Update settings based on tool_selection
                 existing_metadata["comprehensive_settings"]["use_web_search"] = request.tool_selection.get("web_search", False)
                 existing_metadata["comprehensive_settings"]["use_local_rag"] = request.tool_selection.get("local_rag", False)
+
+                # Get auto_create_document_group from existing metadata (should have been set at mission creation)
+                # or from research_params
+                auto_create = existing_metadata.get("auto_create_document_group", False)
+                if "research_params" in existing_metadata:
+                    auto_create = existing_metadata["research_params"].get("auto_create_document_group", auto_create)
+
+                existing_metadata["comprehensive_settings"]["auto_create_document_group"] = auto_create
                 existing_metadata["comprehensive_settings"]["settings_captured_at_start"] = True
                 existing_metadata["comprehensive_settings"]["start_time_capture"] = datetime.now().isoformat()
                 existing_metadata["comprehensive_settings"]["start_method"] = "chat_approve"  # Indicates started via chat approval
@@ -403,10 +411,11 @@ async def approve_research_questions(
                 existing_metadata["use_web_search"] = request.tool_selection.get("web_search", False)
                 existing_metadata["use_local_rag"] = request.tool_selection.get("local_rag", False)
                 existing_metadata["tool_selection"] = request.tool_selection
+                existing_metadata["auto_create_document_group"] = auto_create
 
                 # Store the updated metadata
                 await agent_controller.context_manager.update_mission_metadata(request.mission_id, existing_metadata)
-                logger.info(f"Updated comprehensive_settings for mission {request.mission_id} started via chat approval")
+                logger.info(f"Updated comprehensive_settings for mission {request.mission_id} started via chat approval with auto_create={auto_create}")
 
             # Update mission status to indicate research is starting
             await agent_controller.context_manager.update_mission_status(

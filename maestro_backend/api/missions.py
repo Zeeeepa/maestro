@@ -2351,6 +2351,13 @@ async def start_mission_execution(
                 logger.info(f"Using mission-specific document_group_id: {doc_group_id}")
                 settings_updated = True
 
+            # Also update auto_create_document_group from chat settings to metadata
+            # This ensures it's available when comprehensive_settings is updated
+            if chat_auto_save_docs is not None and "auto_create_document_group" not in mission_specific_settings:
+                existing_metadata["auto_create_document_group"] = chat_auto_save_docs
+                logger.info(f"Updated auto_create_document_group from chat to metadata: {chat_auto_save_docs}")
+                settings_updated = True
+
             if settings_updated:
                 logger.info(f"Applied settings to mission {mission_id} with proper priority (Mission > Chat)")
 
@@ -2370,7 +2377,17 @@ async def start_mission_execution(
         existing_metadata["comprehensive_settings"]["use_web_search"] = existing_metadata.get("use_web_search", False)
         existing_metadata["comprehensive_settings"]["use_local_rag"] = existing_metadata.get("use_local_rag", False)
         existing_metadata["comprehensive_settings"]["document_group_id"] = existing_metadata.get("document_group_id")
-        existing_metadata["comprehensive_settings"]["auto_create_document_group"] = current_research_params.get("auto_create_document_group", False) if current_research_params else False
+
+        # For auto_create_document_group, check multiple sources in priority order
+        # Priority: current_research_params (which includes chat settings) > existing metadata > false
+        auto_create_from_params = current_research_params.get("auto_create_document_group") if current_research_params else None
+        auto_create_from_metadata = existing_metadata.get("auto_create_document_group")
+        auto_create_final = auto_create_from_params if auto_create_from_params is not None else (auto_create_from_metadata if auto_create_from_metadata is not None else False)
+
+        existing_metadata["comprehensive_settings"]["auto_create_document_group"] = auto_create_final
+        existing_metadata["auto_create_document_group"] = auto_create_final  # Also update at top level
+
+        logger.info(f"auto_create_document_group - from params: {auto_create_from_params}, from metadata: {auto_create_from_metadata}, final: {auto_create_final}")
 
         # Get document group name if we have an ID
         if existing_metadata.get("document_group_id"):
