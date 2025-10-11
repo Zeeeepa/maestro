@@ -835,7 +835,7 @@ async def delete_chat(db: AsyncSession, chat_id: str, user_id: int) -> bool:
             .where(
                 and_(
                     models.Mission.chat_id == chat_id,
-                    models.Mission.status.in_(['pending', 'running', 'paused'])
+                    models.Mission.status.in_(['pending', 'running', 'paused', 'planning'])
                 )
             )
             .values(status='stopped', updated_at=get_current_time())
