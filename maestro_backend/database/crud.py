@@ -630,11 +630,29 @@ def update_document_group(db: Session, group_id: str, user_id: int, name: str, d
 def delete_document_group(db: Session, group_id: str, user_id: int) -> bool:
     """Delete a document group."""
     db_group = get_document_group(db, group_id, user_id)
-    if db_group:
-        db.delete(db_group)
-        db.commit()
-        return True
-    return False
+    if not db_group:
+        return False
+
+    # Check for active missions referencing this document group
+    active_missions = db.query(Mission).filter(
+        and_(
+            Mission.generated_document_group_id == group_id,
+            Mission.status.in_(['pending', 'running', 'paused'])
+        )
+    ).all()
+
+    if active_missions:
+        mission_ids = [str(m.id) for m in active_missions]
+        raise ValueError(
+            f"Cannot delete document group: {len(active_missions)} active mission(s) are using it. "
+            f"Please wait for missions to complete or stop them first. Mission IDs: {', '.join(mission_ids[:3])}"
+            + ("..." if len(mission_ids) > 3 else "")
+        )
+
+    # Safe to delete - either no missions reference it, or all are completed/stopped/failed
+    db.delete(db_group)
+    db.commit()
+    return True
 
 def add_document_to_group(db: Session, group_id: str, doc_id: str, user_id: int) -> Optional[DocumentGroup]:
     """Add a document to a document group."""

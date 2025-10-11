@@ -572,9 +572,13 @@ class ReflectionManager:
             section_id = sections_to_process_ids[i] # Get corresponding section_id
             section_note_count = len(notes_by_section[section_id])
 
-            if isinstance(result, Exception):
-                logger.error(f"Redundancy check for section {section_id} failed with exception: {result}. Keeping all {section_note_count} notes for this section.", exc_info=result)
-                # Keep all notes from this section on error
+            # NOTE: In Python 3.8+, asyncio.CancelledError is BaseException, not Exception
+            if isinstance(result, BaseException):
+                if isinstance(result, asyncio.CancelledError):
+                    logger.debug(f"Redundancy check for section {section_id} was cancelled during mission pause. Keeping all {section_note_count} notes for this section.")
+                else:
+                    logger.error(f"Redundancy check for section {section_id} failed with exception: {result}. Keeping all {section_note_count} notes for this section.", exc_info=result)
+                # Keep all notes from this section on error or cancellation
                 all_notes_to_keep_ids.update(note.note_id for note in notes_by_section[section_id])
             elif isinstance(result, set):
                  logger.info(f"Redundancy check for section {section_id} completed. Kept {len(result)} out of {section_note_count} notes.")

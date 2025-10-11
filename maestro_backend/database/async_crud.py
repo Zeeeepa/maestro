@@ -815,17 +815,35 @@ async def update_chat_settings(db: AsyncSession, chat_id: str, user_id: int, set
     return chat
 
 async def delete_chat(db: AsyncSession, chat_id: str, user_id: int) -> bool:
-    """Delete a chat and all its messages asynchronously."""
+    """Delete a chat and all its messages and missions asynchronously."""
     chat = await get_chat(db, chat_id, user_id)
     if not chat:
         return False
-    
-    # Delete all messages first
+
+    # First, stop any active missions to prevent lock contention
+    # This updates mission status so agents will stop updating them
+    await db.execute(
+        update(models.Mission)
+        .where(
+            and_(
+                models.Mission.chat_id == chat_id,
+                models.Mission.status.in_(['pending', 'running', 'paused'])
+            )
+        )
+        .values(status='stopped', updated_at=get_current_time())
+    )
+    await db.commit()
+
+    # Small delay to allow any in-flight agent updates to complete
+    import asyncio
+    await asyncio.sleep(0.5)
+
+    # Delete all messages
     await db.execute(
         delete(models.Message).where(models.Message.chat_id == chat_id)
     )
-    
-    # Delete the chat
+
+    # Delete the chat (missions will cascade delete)
     await db.delete(chat)
     await db.commit()
     return True

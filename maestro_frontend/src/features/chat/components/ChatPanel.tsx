@@ -299,30 +299,36 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ chatId: propChatId }) => {
       console.log('Skipping save - loading:', isLoadingSettings, 'initialized:', hasInitializedSettings)
       return
     }
-    
+
     // Skip if no chat exists
     const targetChatId = chatId || activeChat?.id
     if (!targetChatId) {
       console.log('No chat ID available, skipping save')
       return
     }
-    
-    // Skip saving if there's an active mission (settings are controlled by mission)
-    if (currentChat?.missionId) {
-      console.log('Mission is active, skipping save to prevent overwriting mission settings')
+
+    // Only skip saving if mission is actually running/paused/completed
+    // Allow saving settings for pending missions (before they start)
+    if (currentMission &&
+        (currentMission.status === 'running' ||
+         currentMission.status === 'paused' ||
+         currentMission.status === 'completed' ||
+         currentMission.status === 'failed' ||
+         currentMission.status === 'stopped')) {
+      console.log('Mission is running/paused/completed, skipping save. Status:', currentMission.status)
       return
     }
-    
+
     console.log('Settings changed - Group:', selectedGroupId, 'WebSearch:', useWebSearch, 'AutoSave:', autoCreateDocumentGroup, 'ChatId:', targetChatId)
-    
+
     // Debounce the save operation
     const timer = setTimeout(() => {
       console.log('Executing save after debounce')
       saveSettings()
     }, 500)
-    
+
     return () => clearTimeout(timer)
-  }, [selectedGroupId, useWebSearch, autoCreateDocumentGroup, isLoadingSettings, hasInitializedSettings, saveSettings, currentChat?.missionId])
+  }, [selectedGroupId, useWebSearch, autoCreateDocumentGroup, isLoadingSettings, hasInitializedSettings, saveSettings, currentChat?.missionId, currentMission?.status])
 
   const handleSendMessage = async () => {
     if (!message.trim() || isLoading) return

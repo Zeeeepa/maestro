@@ -340,6 +340,10 @@ class ResearchManager:
                         else:
                             logger.warning(f"Max questions limit ({max_questions}) reached or approached. Cannot add {len(new_sub_questions)} new sub-questions to queue.")
 
+                except asyncio.CancelledError:
+                    # Task was cancelled during mission pause - this is expected, just log and continue
+                    logger.debug("Exploration task was cancelled during mission pause")
+                    continue
                 except Exception as task_exec_e:
                     logger.error(f"Error retrieving result from exploration task: {task_exec_e}", exc_info=True)
                     await self.controller.context_manager.log_execution_step(

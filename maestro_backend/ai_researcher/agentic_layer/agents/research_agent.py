@@ -1843,13 +1843,14 @@ If no relevant sub-questions are identified, return an empty list for "sub_quest
         tool_calls_list = []
         for i, result in enumerate(search_task_results):
             # Skip if the task was cancelled or failed
-            if isinstance(result, Exception):
+            # NOTE: In Python 3.8+, asyncio.CancelledError is BaseException, not Exception
+            if isinstance(result, BaseException):
                 if isinstance(result, asyncio.CancelledError):
-                    logger.debug(f"Search task {i} was cancelled")
+                    logger.debug(f"Search task {i} was cancelled during mission pause")
                 else:
                     logger.warning(f"Search task {i} failed with exception: {result}")
                 continue
-            
+
             # Unpack the result tuple
             result_list, tool_call_details = result
             tool_calls_list.append(tool_call_details)

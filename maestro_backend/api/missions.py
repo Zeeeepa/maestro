@@ -2255,17 +2255,29 @@ async def start_mission_execution(
             
             logger.info(f"Captured {len(current_research_params)} research parameters from user settings at start time")
         
+        # Get the chat's current settings to use for this mission start
+        # This ensures we use the settings the user just configured, not old ones
+        mission_db = crud.get_mission(db, mission_id=mission_id, user_id=current_user.id)
+        if mission_db and mission_db.chat_id:
+            chat_db = crud.get_chat(db, chat_id=mission_db.chat_id, user_id=current_user.id)
+            if chat_db and chat_db.settings:
+                chat_settings = chat_db.settings
+                logger.info(f"Reading chat settings for mission {mission_id}: {chat_settings}")
+
+                # Override auto_create_document_group from chat settings
+                if "auto_create_document_group" in chat_settings:
+                    # Initialize current_research_params if it's None
+                    if current_research_params is None:
+                        current_research_params = {}
+                    current_research_params["auto_create_document_group"] = chat_settings["auto_create_document_group"]
+                    logger.info(f"Using auto_create_document_group from chat settings: {chat_settings['auto_create_document_group']}")
+
         # Update mission with current settings if they exist
         if current_research_params:
             # Get existing metadata
             existing_metadata = mission_context.metadata or {}
-            
-            # Preserve auto_create_document_group if it was already set
-            existing_research_params = existing_metadata.get("research_params", {})
-            if "auto_create_document_group" in existing_research_params:
-                current_research_params["auto_create_document_group"] = existing_research_params["auto_create_document_group"]
-            
-            # Update research_params with current settings
+
+            # Update research_params with current settings (no longer preserving old values)
             existing_metadata["research_params"] = current_research_params
             existing_metadata["settings_captured_at_start"] = True
             existing_metadata["start_time_capture"] = datetime.now().isoformat()
