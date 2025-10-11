@@ -173,21 +173,24 @@ export const ChatHistorySidebar: React.FC<ChatHistorySidebarProps> = React.memo(
 
   const handleDeleteConfirm = async () => {
     if (!chatToDelete) return
-    
+
     try {
       setIsDeleting(true)
       const isCurrentChat = activeChat?.id === chatToDelete.id
       await deleteChat(chatToDelete.id)
-      
+
       if (isCurrentChat) {
         setView('research')
         navigate('/app')
       }
-      
+
       setDeleteModalOpen(false)
       setChatToDelete(null)
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to delete chat:', error)
+      // Show the actual error message to help debug
+      const errorMsg = error?.response?.data?.detail || error?.message || 'Failed to delete chat'
+      alert(`Error deleting chat: ${errorMsg}`)
     } finally {
       setIsDeleting(false)
     }

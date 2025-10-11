@@ -140,18 +140,6 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ missionId }) => {
 
   return (
     <div className="space-y-4 p-4 overflow-y-auto max-h-full">
-      {/* Info Banner */}
-      {settings?.comprehensive_settings?.settings_captured_at_start && (
-        <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 text-xs">
-          <div className="flex items-center gap-2">
-            <Clock className="h-3.5 w-3.5 text-blue-500" />
-            <span className="text-blue-600 dark:text-blue-400">
-              These settings were captured when the mission was started, not when it was created.
-            </span>
-          </div>
-        </div>
-      )}
-
       {/* Mission Start Settings - Shows actual settings used when mission started */}
       {settings?.comprehensive_settings && (
         <Card className="border-primary/20">

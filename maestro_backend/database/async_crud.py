@@ -816,37 +816,55 @@ async def update_chat_settings(db: AsyncSession, chat_id: str, user_id: int, set
 
 async def delete_chat(db: AsyncSession, chat_id: str, user_id: int) -> bool:
     """Delete a chat and all its messages and missions asynchronously."""
+    import logging
+    logger = logging.getLogger(__name__)
+
+    logger.info(f"Starting deletion of chat {chat_id} for user {user_id}")
+
     chat = await get_chat(db, chat_id, user_id)
     if not chat:
+        logger.warning(f"Chat {chat_id} not found for user {user_id}")
         return False
 
-    # First, stop any active missions to prevent lock contention
-    # This updates mission status so agents will stop updating them
-    await db.execute(
-        update(models.Mission)
-        .where(
-            and_(
-                models.Mission.chat_id == chat_id,
-                models.Mission.status.in_(['pending', 'running', 'paused'])
+    try:
+        # First, stop any active missions to prevent lock contention
+        # This updates mission status so agents will stop updating them
+        logger.info(f"Stopping active missions for chat {chat_id}")
+        result = await db.execute(
+            update(models.Mission)
+            .where(
+                and_(
+                    models.Mission.chat_id == chat_id,
+                    models.Mission.status.in_(['pending', 'running', 'paused'])
+                )
             )
+            .values(status='stopped', updated_at=get_current_time())
         )
-        .values(status='stopped', updated_at=get_current_time())
-    )
-    await db.commit()
+        logger.info(f"Updated {result.rowcount} missions to stopped status")
+        await db.commit()
 
-    # Small delay to allow any in-flight agent updates to complete
-    import asyncio
-    await asyncio.sleep(0.5)
+        # Small delay to allow any in-flight agent updates to complete
+        import asyncio
+        await asyncio.sleep(0.5)
 
-    # Delete all messages
-    await db.execute(
-        delete(models.Message).where(models.Message.chat_id == chat_id)
-    )
+        # Delete all messages
+        logger.info(f"Deleting messages for chat {chat_id}")
+        msg_result = await db.execute(
+            delete(models.Message).where(models.Message.chat_id == chat_id)
+        )
+        logger.info(f"Deleted {msg_result.rowcount} messages")
 
-    # Delete the chat (missions will cascade delete)
-    await db.delete(chat)
-    await db.commit()
-    return True
+        # Delete the chat (missions will cascade delete)
+        logger.info(f"Deleting chat {chat_id}")
+        await db.delete(chat)
+        await db.commit()
+
+        logger.info(f"Successfully deleted chat {chat_id}")
+        return True
+    except Exception as e:
+        logger.error(f"Error deleting chat {chat_id}: {str(e)}", exc_info=True)
+        await db.rollback()
+        raise
 
 # ============================================================================
 # MESSAGE OPERATIONS
