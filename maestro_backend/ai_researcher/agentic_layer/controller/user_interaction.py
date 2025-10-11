@@ -247,6 +247,51 @@ Output ONLY a single JSON object conforming EXACTLY to the RequestAnalysisOutput
                 if context.plan:
                     mission_context_summary += f", Goal='{context.plan.mission_goal[:50]}...'"
 
+                # CRITICAL: Update mission settings with current UI settings BEFORE processing
+                # This ensures "okay start" uses the latest settings from the UI
+                if context.status in ['planning', 'paused', 'pending']:
+                    logger.info(f"Updating mission {mission_id} with current UI settings before processing message")
+
+                    # Get existing metadata
+                    existing_metadata = context.metadata or {}
+
+                    # Build tool selection
+                    tool_selection = {
+                        "web_search": use_web_search,
+                        "local_rag": document_group_id is not None
+                    }
+
+                    # Get user settings for comprehensive_settings
+                    from ai_researcher.user_context import get_current_user
+                    from datetime import datetime
+                    current_user = get_current_user()
+                    user_settings = current_user.settings if current_user and hasattr(current_user, 'settings') else {}
+
+                    # Update comprehensive_settings with current UI settings
+                    comprehensive_settings = existing_metadata.get("comprehensive_settings", {})
+                    comprehensive_settings.update({
+                        "use_web_search": use_web_search,
+                        "use_local_rag": document_group_id is not None,
+                        "auto_create_document_group": auto_create_document_group,
+                        "document_group_id": document_group_id,
+                        "settings_updated_from_chat": True,
+                        "chat_update_time": datetime.now().isoformat()
+                    })
+
+                    # Update metadata with current settings
+                    existing_metadata.update({
+                        "tool_selection": tool_selection,
+                        "document_group_id": document_group_id,
+                        "use_web_search": use_web_search,
+                        "use_local_rag": document_group_id is not None,
+                        "auto_create_document_group": auto_create_document_group,
+                        "comprehensive_settings": comprehensive_settings
+                    })
+
+                    # Save the updated metadata
+                    await self.controller.context_manager.update_mission_metadata(mission_id, existing_metadata)
+                    logger.info(f"Updated mission {mission_id} settings - Web Search: {use_web_search}, Doc Group: {document_group_id}, Auto-save: {auto_create_document_group}")
+
         # Fetch current scratchpad
         current_scratchpad = self.controller.context_manager.get_scratchpad(mission_id) if mission_id else None
         # Fetch Active Goals & Thoughts
