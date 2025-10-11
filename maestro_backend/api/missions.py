@@ -2864,7 +2864,8 @@ async def get_mission_info(
             "document_group_name": document_group_name,
             "use_web_search": use_web_search,
             "use_local_rag": use_local_rag,
-            "error_info": mission_context.error_info
+            "error_info": mission_context.error_info,
+            "metadata": metadata  # Include the full metadata for frontend to use
         }
     except HTTPException:
         raise

@@ -757,16 +757,17 @@ export const useMissionStore = create<MissionState>((set, get) => ({
 
       // If mission doesn't exist in DB, fetch complete mission info from the backend
       const response = await apiClient.get(`/api/missions/${missionId}/info`)
-      const { 
-        status, 
-        updated_at, 
-        created_at, 
-        tool_selection, 
-        document_group_id, 
+      const {
+        status,
+        updated_at,
+        created_at,
+        tool_selection,
+        document_group_id,
         document_group_name,
         use_web_search,
         use_local_rag,
-        user_request 
+        user_request,
+        metadata
       } = response.data
 
       // Fetch document group name if we have an ID but no name
@@ -790,14 +791,15 @@ export const useMissionStore = create<MissionState>((set, get) => ({
         status: status,
         createdAt: new Date(created_at || updated_at),
         updatedAt: new Date(updated_at),
-        tool_selection: tool_selection || { 
-          web_search: use_web_search !== undefined ? use_web_search : true, 
-          local_rag: use_local_rag !== undefined ? use_local_rag : false 
+        tool_selection: tool_selection || {
+          web_search: use_web_search !== undefined ? use_web_search : true,
+          local_rag: use_local_rag !== undefined ? use_local_rag : false
         },
         document_group_id: document_group_id,
         document_group_name: finalDocumentGroupName,
         use_web_search: use_web_search,
         use_local_rag: use_local_rag,
+        metadata: metadata  // Include metadata from API response
       }
 
       // Save to IndexedDB and add to store

@@ -298,12 +298,12 @@ class AsyncContextManager:
         Adds missing timestamp fields to notes and handles other schema changes.
         """
         migrated_context = context_dict.copy()
-        
+
         # Migrate notes to add missing timestamp fields
         if 'notes' in migrated_context and isinstance(migrated_context['notes'], list):
             current_time = get_current_time()
             migrated_notes = []
-            
+
             for note_data in migrated_context['notes']:
                 if isinstance(note_data, dict):
                     # Add missing timestamp fields if they don't exist
@@ -315,10 +315,48 @@ class AsyncContextManager:
                 else:
                     # Skip invalid note data
                     logger.warning(f"Skipping invalid note data during migration: {note_data}")
-            
+
             migrated_context['notes'] = migrated_notes
             # logger.info(f"Migrated {len(migrated_notes)} notes with timestamp fields")
-        
+
+        # Ensure metadata has source configuration fields
+        if 'metadata' in migrated_context and migrated_context['metadata']:
+            metadata = migrated_context['metadata']
+
+            # Check if we have comprehensive_settings to restore from
+            if 'comprehensive_settings' in metadata:
+                comp_settings = metadata['comprehensive_settings']
+                # Ensure top-level metadata has the source settings for easy access
+                if 'use_web_search' not in metadata and 'use_web_search' in comp_settings:
+                    metadata['use_web_search'] = comp_settings['use_web_search']
+                if 'use_local_rag' not in metadata and 'use_local_rag' in comp_settings:
+                    metadata['use_local_rag'] = comp_settings['use_local_rag']
+                if 'document_group_id' not in metadata and 'document_group_id' in comp_settings:
+                    metadata['document_group_id'] = comp_settings['document_group_id']
+                if 'document_group_name' not in metadata and 'document_group_name' in comp_settings:
+                    metadata['document_group_name'] = comp_settings['document_group_name']
+
+            # Also check mission_settings field for source configuration
+            if 'mission_settings' in metadata and metadata['mission_settings']:
+                mission_settings = metadata['mission_settings']
+                if 'use_web_search' not in metadata and 'search_provider' in mission_settings:
+                    metadata['use_web_search'] = True  # If there's a search provider, web search was enabled
+
+            # Ensure tool_selection exists if we have the data
+            if 'tool_selection' not in metadata:
+                metadata['tool_selection'] = {
+                    'web_search': metadata.get('use_web_search', migrated_context.get('use_web_search', False)),
+                    'local_rag': metadata.get('use_local_rag', bool(metadata.get('document_group_id')))
+                }
+
+        # Also ensure top-level use_web_search field if missing
+        if 'use_web_search' not in migrated_context:
+            # Try to get from metadata
+            if 'metadata' in migrated_context and migrated_context['metadata']:
+                migrated_context['use_web_search'] = migrated_context['metadata'].get('use_web_search', True)
+            else:
+                migrated_context['use_web_search'] = True  # Default to true for backward compatibility
+
         return migrated_context
 
     # --- Public Methods ---
