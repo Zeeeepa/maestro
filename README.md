@@ -5,16 +5,17 @@
 # MAESTRO: Your Self-Hosted AI Research Assistant
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
-[![Version](https://img.shields.io/badge/Version-0.1.9--alpha-green.svg)](https://github.com/murtaza-nasir/maestro.git)
+[![Version](https://img.shields.io/badge/Version-0.1.10--alpha-green.svg)](https://github.com/murtaza-nasir/maestro.git)
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://hub.docker.com/r/murtaza-nasir/maestro)
 [![Documentation](https://img.shields.io/badge/Docs-Available-brightgreen.svg)](https://murtaza-nasir.github.io/maestro/)
 
-> **Version 0.1.9-alpha (Oct 3, 2025) - Stability & Security Update**
+> **Version 0.1.10-alpha (Oct 12, 2025) - Azure OpenAI & Configuration Improvements**
 >
-> - **Mission Stability**: Fixed pause/resume with proper checkpoint handling
-> - **Security Update**: Replaced passlib with maintained libpass fork
-> - **Bug Fixes**: Resolved Round/Pass counter and activity log persistence issues
-> - **Password Compatibility**: Fixed bcrypt compatibility for authentication 
+> - **Azure OpenAI Support**: Support for Azure OpenAI including GPT-5 models with automatic parameter handling
+> - **Manual Model Entry**: New toggle to bypass automatic model fetching for providers like Azure that don't support `/models` endpoint
+> - **Improved Error Handling**: Fixed 401 errors from external providers no longer logging users out
+> - **Settings Fixes**: Mission settings now persist correctly across server restarts with proper priority handling
+> - **UX Improvements**: Disabled autocomplete on API key fields to prevent browser autofill issues 
 
 MAESTRO is an AI-powered research platform you can host on your own hardware. It's designed to manage complex research tasks from start to finish in a collaborative research environment. Plan your research, let AI agents carry it out, and watch as they generate detailed reports based on your documents and sources from the web.
 
@@ -146,6 +147,21 @@ For troubleshooting and advanced configuration, see the [documentation](https://
 
 ## Recent Releases
 
+### Version 0.1.10-alpha (October 12, 2025)
+**Azure OpenAI & Configuration Improvements**
+- Azure OpenAI support including GPT-5 models with automatic parameter handling
+- Manual model entry toggle for providers without `/models` endpoint support
+- Fixed 401 errors from external providers no longer logging users out
+- Mission settings now persist correctly across server restarts
+- Disabled autocomplete on API key fields to prevent browser autofill issues
+
+### Version 0.1.9-alpha (October 3, 2025)
+**Stability & Security Update**
+- Fixed mission pause/resume with proper checkpoint handling
+- Replaced passlib with maintained libpass fork
+- Resolved Round/Pass counter and activity log persistence issues
+- Fixed bcrypt compatibility for authentication
+
 ### Version 0.1.8-alpha (September 26, 2025)
 **Mission Resilience & Document Intelligence Update**
 - Intelligent mission resume with complete checkpoint preservation
@@ -153,27 +169,6 @@ For troubleshooting and advanced configuration, see the [documentation](https://
 - Writing phase resume support
 - Document reprocessing and re-embedding capabilities
 - Fixed progress indicators for accurate research tracking
-
-### Version 0.1.7-alpha (September 25, 2025)
-**Intelligent Document Management & Enhanced Research**
-- Auto-create document groups from discovered web sources
-- Seamless transition from research to writing workspace
-- Report versioning with multiple version tracking
-- Clickable document references in writing mode
-- Improved mission restart and revise functionality
-
-### Version 0.1.6-alpha (September 23, 2025)
-**Model Support & Cost Tracking**
-- GPT-5 support with configurable thinking levels
-- Comprehensive cost tracking across all API calls
-- Enhanced DeepSeek compatibility
-- Improved error handling and retry logic
-
-### Version 0.1.5-alpha (September 2, 2025)
-**Major Performance Update**
-- Complete async backend migration (2-3x faster)
-- 50+ bug fixes and stability improvements
-- Enhanced UI/UX with LaTeX support
 
 ## Core Features
 

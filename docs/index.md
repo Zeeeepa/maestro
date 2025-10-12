@@ -7,7 +7,7 @@
   
   <div style="margin-top: 1rem;">
     <a href="https://www.gnu.org/licenses/agpl-3.0"><img src="https://img.shields.io/badge/License-AGPL_v3-blue.svg" alt="License: AGPL v3"/></a>
-    <a href="https://github.com/murtaza-nasir/maestro.git"><img src="https://img.shields.io/badge/Version-0.1.9--alpha-green.svg" alt="Version"/></a>
+    <a href="https://github.com/murtaza-nasir/maestro.git"><img src="https://img.shields.io/badge/Version-0.1.10--alpha-green.svg" alt="Version"/></a>
     <a href="https://hub.docker.com/r/murtaza-nasir/maestro"><img src="https://img.shields.io/badge/Docker-Ready-blue.svg" alt="Docker"/></a>
   </div>
 </div>
@@ -238,7 +238,19 @@ graph TB
 
 <div class="grid cards" markdown>
 
--   :material-rocket: **Version 0.1.9-alpha** <small>Released Oct 3, 2025</small>
+-   :material-rocket: **Version 0.1.10-alpha** <small>Released Oct 12, 2025</small>
+
+    ---
+
+    **Azure OpenAI & Configuration Improvements**
+
+    - Full Azure OpenAI support including GPT-5 models with automatic parameter handling
+    - Manual model entry toggle for providers without `/models` endpoint support
+    - Fixed 401 errors from external providers no longer logging users out
+    - Mission settings now persist correctly across server restarts
+    - Disabled autocomplete on API key fields to prevent browser autofill
+
+-   :material-history: **Version 0.1.9-alpha** <small>Released Oct 3, 2025</small>
 
     ---
 
