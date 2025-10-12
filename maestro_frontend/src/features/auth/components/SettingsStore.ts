@@ -121,7 +121,8 @@ interface SettingsState {
   isTestingConnection: boolean
   connectionTestResult: { success: boolean; message: string } | null
   modelsFetchError: string | null
-  
+  manualModelEntry: boolean
+
   // Actions
   loadSettings: () => Promise<void>
   updateSettings: () => Promise<void>
@@ -133,6 +134,7 @@ interface SettingsState {
   resetConnectionTest: () => void
   clearModels: () => void
   clearModelsFetchError: () => void
+  setManualModelEntry: (enabled: boolean) => void
 }
 
 // Validation function for AI settings
@@ -295,6 +297,7 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
   isTestingConnection: false,
   connectionTestResult: null,
   modelsFetchError: null,
+  manualModelEntry: false,
 
   loadSettings: async () => {
     try {
@@ -548,5 +551,9 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
 
   clearModelsFetchError: () => {
     set({ modelsFetchError: null })
+  },
+
+  setManualModelEntry: (enabled: boolean) => {
+    set({ manualModelEntry: enabled })
   }
 }))

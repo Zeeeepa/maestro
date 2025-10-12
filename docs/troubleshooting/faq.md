@@ -35,6 +35,22 @@ Your tracked costs may typically be 40-60% of actual dashboard charges, especial
 
 **A:** Yes! MAESTRO supports any OpenAI-compatible endpoint. See our [Local LLM Deployment Guide](../deployment/local-llms.md) for setup instructions.
 
+### Q: How do I configure Azure OpenAI?
+
+**A:** Azure OpenAI requires specific URL formatting:
+
+1. Select "Custom Provider"
+2. Base URL: `https://your-resource.openai.azure.com/openai/v1/`
+   - **Must end with** `/openai/v1/` (not `/openai/deployments/`)
+3. Enable "Manual Model Entry" toggle
+4. Enter your Azure deployment names (not model names)
+
+**Note**: Different providers may require specific URL path suffixes. Always verify the correct format:
+- Azure OpenAI: `/openai/v1/`
+- Most others: `/v1/`
+
+See [AI Provider Configuration](../getting-started/configuration/ai-providers.md#azure-openai) for details.
+
 ## Common Issues
 
 ### Q: Why are my responses slow?

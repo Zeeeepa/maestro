@@ -167,23 +167,37 @@ apiClient.interceptors.response.use(
   },
   (error) => {
     if (error.response?.status === 401) {
-      console.log('Authentication error detected, clearing stored tokens')
-      // Clear stored tokens on 401 errors
-      localStorage.removeItem('access_token')
-      
-      // Clear auth store if available
-      try {
-        const authStore = (window as any).__AUTH_STORE__
-        if (authStore && authStore.getState && authStore.getState().logout) {
-          authStore.getState().logout()
+      // Only redirect to login for actual authentication failures (our own API)
+      // Don't redirect for 401s from settings endpoints (model fetching, connection tests)
+      // as these are external provider API errors, not Maestro auth errors
+      const url = error.config?.url || ''
+      const isSettingsEndpoint = url.includes('/me/settings/models') ||
+                                  url.includes('/me/settings/test-connection')
+
+      // Also check if the 401 is from an external API (non-relative URL or has external host)
+      const isExternalApi = url.startsWith('http://') || url.startsWith('https://')
+
+      if (!isSettingsEndpoint && !isExternalApi) {
+        console.log('Authentication error detected, clearing stored tokens')
+        // Clear stored tokens on 401 errors
+        localStorage.removeItem('access_token')
+
+        // Clear auth store if available
+        try {
+          const authStore = (window as any).__AUTH_STORE__
+          if (authStore && authStore.getState && authStore.getState().logout) {
+            authStore.getState().logout()
+          }
+        } catch (e) {
+          // Ignore errors accessing auth store
         }
-      } catch (e) {
-        // Ignore errors accessing auth store
-      }
-      
-      // Redirect to login if not already there
-      if (!window.location.pathname.includes('/login')) {
-        window.location.href = '/login'
+
+        // Redirect to login if not already there
+        if (!window.location.pathname.includes('/login')) {
+          window.location.href = '/login'
+        }
+      } else {
+        console.log('401 error from settings/external endpoint - not logging out user')
       }
     }
     return Promise.reject(error)

@@ -502,10 +502,20 @@ class ModelDispatcher:
 
         # Check if this is a GPT-5 model that requires special handling
         is_gpt5_model = any(x in selected_model_name.lower() for x in ['gpt-5', 'gpt5'])
-        
+
+        # Check if this is Azure OpenAI by looking at the base URL
+        base_url_str = str(getattr(client, 'base_url', ''))
+        is_azure = 'azure' in base_url_str.lower()
+
+        # GPT-5 special handling applies to OpenAI API and Azure OpenAI
+        is_openai_or_azure = provider_name == "openai" or (provider_name == "custom" and is_azure)
+
+        if is_azure and is_gpt5_model:
+            logger.info(f"Detected Azure OpenAI with GPT-5 model: {selected_model_name}, using max_completion_tokens")
+
         # Get thinking_level from user settings if available
         thinking_level = None
-        if is_gpt5_model and provider_name == "openai":
+        if is_gpt5_model and is_openai_or_azure:
             # Try to get thinking level from user settings
             ai_endpoints = self.user_settings.get("ai_endpoints", {})
             advanced_models = ai_endpoints.get("advanced_models", {})
@@ -515,9 +525,9 @@ class ModelDispatcher:
                     break
             if not thinking_level:
                 thinking_level = "low"  # Default thinking level
-        
+
         # Build request parameters based on model type
-        if is_gpt5_model and provider_name == "openai":
+        if is_gpt5_model and is_openai_or_azure:
             # GPT-5 models via OpenAI API require special parameters
             request_params = {
                 "model": selected_model_name,
@@ -881,10 +891,16 @@ class ModelDispatcher:
                 
                 # Check for GPT-5 parameter errors and retry with correct parameters
                 error_msg = str(e)
-                if e.status_code == 400 and provider_name == "openai":
+                # Check if this is Azure by looking at base URL
+                base_url_str = str(getattr(client, 'base_url', ''))
+                is_azure = 'azure' in base_url_str.lower()
+                is_openai_or_azure = provider_name == "openai" or (provider_name == "custom" and is_azure)
+
+                if e.status_code == 400 and is_openai_or_azure:
                     # Check for max_tokens vs max_completion_tokens error
                     if "max_tokens" in error_msg and "max_completion_tokens" in error_msg:
-                        logger.info(f"Detected GPT-5 parameter error, retrying with max_completion_tokens...")
+                        provider_type = "Azure OpenAI" if is_azure else "OpenAI"
+                        logger.info(f"Detected GPT-5 parameter error on {provider_type}, retrying with max_completion_tokens...")
                         # Rebuild request params with max_completion_tokens
                         if "max_tokens" in request_params:
                             request_params["max_completion_tokens"] = request_params.pop("max_tokens")

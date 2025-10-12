@@ -12,17 +12,19 @@ type ProviderKey = 'openrouter' | 'openai' | 'custom'
 type ModelType = 'fast' | 'mid' | 'intelligent' | 'verifier'
 
 export const AISettingsTab: React.FC = () => {
-  const { 
-    draftSettings, 
-    setDraftSettings, 
-    isTestingConnection, 
-    connectionTestResult, 
-    testConnection, 
-    fetchAvailableModels, 
+  const {
+    draftSettings,
+    setDraftSettings,
+    isTestingConnection,
+    connectionTestResult,
+    testConnection,
+    fetchAvailableModels,
     modelsByProvider,
     modelsFetchError,
     clearModels,
-    clearModelsFetchError
+    clearModelsFetchError,
+    manualModelEntry,
+    setManualModelEntry
   } = useSettingsStore()
   const [testProvider, setTestProvider] = useState<string | null>(null)
   const [refreshingModels, setRefreshingModels] = useState<string | null>(null)
@@ -73,13 +75,13 @@ export const AISettingsTab: React.FC = () => {
   }
 
   useEffect(() => {
-    // Only fetch models in simple mode and when component mounts with an enabled provider
-    // Don't auto-fetch when switching to advanced mode to avoid authentication issues
-    if (draftSettings?.ai_endpoints && !draftSettings.ai_endpoints.advanced_mode) {
+    // Only fetch models in simple mode, when not in manual entry mode, and when component mounts with an enabled provider
+    // Don't auto-fetch when switching to advanced mode or when manual entry is enabled to avoid authentication issues
+    if (draftSettings?.ai_endpoints && !draftSettings.ai_endpoints.advanced_mode && !manualModelEntry) {
       const enabledProvider = Object.entries(draftSettings.ai_endpoints.providers).find(
         ([_, config]) => config.enabled
       )
-      
+
       if (enabledProvider && getModelsForSimpleMode().length === 0) {
         const providerConfig = draftSettings.ai_endpoints.providers[enabledProvider[0] as ProviderKey]
         // Only fetch models if we have an API key configured (except for custom providers)
@@ -88,7 +90,7 @@ export const AISettingsTab: React.FC = () => {
         }
       }
     }
-  }, [draftSettings?.ai_endpoints, fetchAvailableModels])
+  }, [draftSettings?.ai_endpoints, fetchAvailableModels, manualModelEntry])
 
   const getEnabledProvider = (): ProviderKey | null => {
     if (!draftSettings) return null
@@ -99,11 +101,13 @@ export const AISettingsTab: React.FC = () => {
 
   const handleProviderChange = (provider: ProviderKey) => {
     if (!draftSettings) return
-    
-    // Clear models and errors when provider changes
-    clearModels()
-    clearModelsFetchError()
-    
+
+    // Clear models and errors when provider changes (only if not in manual entry mode)
+    if (!manualModelEntry) {
+      clearModels()
+      clearModelsFetchError()
+    }
+
     const newAiEndpoints = {
       ...draftSettings.ai_endpoints,
       providers: {
@@ -119,13 +123,13 @@ export const AISettingsTab: React.FC = () => {
         }
       }
     }
-    
+
     // In simple mode, auto-populate all models with the new provider's config
     if (!draftSettings.ai_endpoints.advanced_mode) {
       const providerConfig = newAiEndpoints.providers[provider] as any
-      const baseUrl = providerConfig.base_url || (provider === 'openrouter' ? 'https://openrouter.ai/api/v1/' : 
+      const baseUrl = providerConfig.base_url || (provider === 'openrouter' ? 'https://openrouter.ai/api/v1/' :
                                                    provider === 'openai' ? 'https://api.openai.com/v1/' : '')
-      
+
       newAiEndpoints.advanced_models = {
         fast: {
           provider,
@@ -153,7 +157,7 @@ export const AISettingsTab: React.FC = () => {
         }
       }
     }
-    
+
     setDraftSettings({ ai_endpoints: newAiEndpoints })
   }
 
@@ -626,13 +630,33 @@ export const AISettingsTab: React.FC = () => {
           {/* Model Selection */}
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Target className="h-4 w-4" />
-                Model Selection
-              </CardTitle>
-              <CardDescription className="text-sm">
-                Select models for different agent types. Available models are fetched from your enabled provider.
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Target className="h-4 w-4" />
+                    Model Selection
+                  </CardTitle>
+                  <CardDescription className="text-sm">
+                    {manualModelEntry
+                      ? "Manually enter model names for different agent types."
+                      : "Select models for different agent types. Available models are fetched from your enabled provider."
+                    }
+                  </CardDescription>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setManualModelEntry(!manualModelEntry)}
+                  className="p-2"
+                  title={manualModelEntry ? "Switch to dropdown selection" : "Switch to manual entry"}
+                >
+                  {manualModelEntry ? (
+                    <ToggleRight className="h-5 w-5 text-blue-600" />
+                  ) : (
+                    <ToggleLeft className="h-5 w-5 text-muted" />
+                  )}
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
               {!enabledProvider ? (
@@ -672,13 +696,22 @@ export const AISettingsTab: React.FC = () => {
                         <Zap className="h-4 w-4" />
                         Fast Model
                       </Label>
-                      <Combobox
-                        value={draftSettings.ai_endpoints.advanced_models.fast.model_name}
-                        onValueChange={(value) => handleModelChange('fast', value)}
-                        options={getModelsForSimpleMode()}
-                        placeholder="Quick responses"
-                      />
-                      <p className="text-xs text-muted-foreground-foreground">For rapid, simple tasks</p>
+                      {manualModelEntry ? (
+                        <Input
+                          value={draftSettings.ai_endpoints.advanced_models.fast.model_name}
+                          onChange={(e) => handleModelChange('fast', e.target.value)}
+                          placeholder="e.g., gpt-4o-mini"
+                          className="h-9 text-sm"
+                        />
+                      ) : (
+                        <Combobox
+                          value={draftSettings.ai_endpoints.advanced_models.fast.model_name}
+                          onValueChange={(value) => handleModelChange('fast', value)}
+                          options={getModelsForSimpleMode()}
+                          placeholder="Quick responses"
+                        />
+                      )}
+                      <p className="text-xs text-muted-foreground">For rapid, simple tasks</p>
                     </div>
 
                     <div className="space-y-1.5">
@@ -686,11 +719,20 @@ export const AISettingsTab: React.FC = () => {
                         <Scale className="h-4 w-4" />
                         Mid Model
                       </Label>
-                      <Combobox
-                        value={draftSettings.ai_endpoints.advanced_models.mid.model_name}
-                        onValueChange={(value) => handleModelChange('mid', value)}
-                        options={getModelsForSimpleMode()}
-                      />
+                      {manualModelEntry ? (
+                        <Input
+                          value={draftSettings.ai_endpoints.advanced_models.mid.model_name}
+                          onChange={(e) => handleModelChange('mid', e.target.value)}
+                          placeholder="e.g., gpt-4o"
+                          className="h-9 text-sm"
+                        />
+                      ) : (
+                        <Combobox
+                          value={draftSettings.ai_endpoints.advanced_models.mid.model_name}
+                          onValueChange={(value) => handleModelChange('mid', value)}
+                          options={getModelsForSimpleMode()}
+                        />
+                      )}
                       <p className="text-xs text-muted-foreground">For balanced performance</p>
                     </div>
 
@@ -699,11 +741,20 @@ export const AISettingsTab: React.FC = () => {
                         <Brain className="h-4 w-4" />
                         Intelligent Model
                       </Label>
-                      <Combobox
-                        value={draftSettings.ai_endpoints.advanced_models.intelligent.model_name}
-                        onValueChange={(value) => handleModelChange('intelligent', value)}
-                        options={getModelsForSimpleMode()}
-                      />
+                      {manualModelEntry ? (
+                        <Input
+                          value={draftSettings.ai_endpoints.advanced_models.intelligent.model_name}
+                          onChange={(e) => handleModelChange('intelligent', e.target.value)}
+                          placeholder="e.g., claude-3-5-sonnet"
+                          className="h-9 text-sm"
+                        />
+                      ) : (
+                        <Combobox
+                          value={draftSettings.ai_endpoints.advanced_models.intelligent.model_name}
+                          onValueChange={(value) => handleModelChange('intelligent', value)}
+                          options={getModelsForSimpleMode()}
+                        />
+                      )}
                       <p className="text-xs text-muted-foreground">For complex analysis</p>
                     </div>
 
@@ -712,11 +763,20 @@ export const AISettingsTab: React.FC = () => {
                         <CheckSquare className="h-4 w-4" />
                         Verifier Model
                       </Label>
-                      <Combobox
-                        value={draftSettings.ai_endpoints.advanced_models.verifier.model_name}
-                        onValueChange={(value) => handleModelChange('verifier', value)}
-                        options={getModelsForSimpleMode()}
-                      />
+                      {manualModelEntry ? (
+                        <Input
+                          value={draftSettings.ai_endpoints.advanced_models.verifier.model_name}
+                          onChange={(e) => handleModelChange('verifier', e.target.value)}
+                          placeholder="e.g., gpt-4o"
+                          className="h-9 text-sm"
+                        />
+                      ) : (
+                        <Combobox
+                          value={draftSettings.ai_endpoints.advanced_models.verifier.model_name}
+                          onValueChange={(value) => handleModelChange('verifier', value)}
+                          options={getModelsForSimpleMode()}
+                        />
+                      )}
                       <p className="text-xs text-muted-foreground">For verification tasks</p>
                     </div>
                   </div>
@@ -787,26 +847,37 @@ export const AISettingsTab: React.FC = () => {
                 <div className="space-y-1.5">
                   <Label className="text-xs flex items-center justify-between">
                     Model Name
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleRefreshModels(draftSettings.ai_endpoints.advanced_models.fast.provider)}
-                      disabled={refreshingModels === draftSettings.ai_endpoints.advanced_models.fast.provider}
-                      className="h-6 w-6 p-0"
-                    >
-                      {refreshingModels === draftSettings.ai_endpoints.advanced_models.fast.provider ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <RefreshCw className="h-3 w-3" />
-                      )}
-                    </Button>
+                    {!manualModelEntry && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRefreshModels(draftSettings.ai_endpoints.advanced_models.fast.provider)}
+                        disabled={refreshingModels === draftSettings.ai_endpoints.advanced_models.fast.provider}
+                        className="h-6 w-6 p-0"
+                      >
+                        {refreshingModels === draftSettings.ai_endpoints.advanced_models.fast.provider ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <RefreshCw className="h-3 w-3" />
+                        )}
+                      </Button>
+                    )}
                   </Label>
-                  <Combobox
-                    value={draftSettings.ai_endpoints.advanced_models.fast.model_name}
-                    onValueChange={(value) => handleAdvancedModelChange('fast', 'model_name', value)}
-                    options={getModelsForModelType('fast')}
-                    placeholder="Select model"
-                  />
+                  {manualModelEntry ? (
+                    <Input
+                      value={draftSettings.ai_endpoints.advanced_models.fast.model_name}
+                      onChange={(e) => handleAdvancedModelChange('fast', 'model_name', e.target.value)}
+                      placeholder="e.g., gpt-4o-mini"
+                      className="h-8 text-sm"
+                    />
+                  ) : (
+                    <Combobox
+                      value={draftSettings.ai_endpoints.advanced_models.fast.model_name}
+                      onValueChange={(value) => handleAdvancedModelChange('fast', 'model_name', value)}
+                      options={getModelsForModelType('fast')}
+                      placeholder="Select model"
+                    />
+                  )}
                 </div>
                 {/* GPT-5 Thinking Level Selector */}
                 {draftSettings.ai_endpoints.advanced_models.fast.model_name && 
@@ -884,26 +955,37 @@ export const AISettingsTab: React.FC = () => {
                 <div className="space-y-1.5">
                   <Label className="text-xs flex items-center justify-between">
                     Model Name
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleRefreshModels(draftSettings.ai_endpoints.advanced_models.mid.provider)}
-                      disabled={refreshingModels === draftSettings.ai_endpoints.advanced_models.mid.provider}
-                      className="h-6 w-6 p-0"
-                    >
-                      {refreshingModels === draftSettings.ai_endpoints.advanced_models.mid.provider ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <RefreshCw className="h-3 w-3" />
-                      )}
-                    </Button>
+                    {!manualModelEntry && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRefreshModels(draftSettings.ai_endpoints.advanced_models.mid.provider)}
+                        disabled={refreshingModels === draftSettings.ai_endpoints.advanced_models.mid.provider}
+                        className="h-6 w-6 p-0"
+                      >
+                        {refreshingModels === draftSettings.ai_endpoints.advanced_models.mid.provider ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <RefreshCw className="h-3 w-3" />
+                        )}
+                      </Button>
+                    )}
                   </Label>
-                  <Combobox
-                    value={draftSettings.ai_endpoints.advanced_models.mid.model_name}
-                    onValueChange={(value) => handleAdvancedModelChange('mid', 'model_name', value)}
-                    options={getModelsForModelType('mid')}
-                    placeholder="Select model"
-                  />
+                  {manualModelEntry ? (
+                    <Input
+                      value={draftSettings.ai_endpoints.advanced_models.mid.model_name}
+                      onChange={(e) => handleAdvancedModelChange('mid', 'model_name', e.target.value)}
+                      placeholder="e.g., gpt-4o or claude-3-5-sonnet"
+                      className="h-8 text-sm"
+                    />
+                  ) : (
+                    <Combobox
+                      value={draftSettings.ai_endpoints.advanced_models.mid.model_name}
+                      onValueChange={(value) => handleAdvancedModelChange('mid', 'model_name', value)}
+                      options={getModelsForModelType('mid')}
+                      placeholder="Select model"
+                    />
+                  )}
                 </div>
                 {/* GPT-5 Thinking Level Selector */}
                 {draftSettings.ai_endpoints.advanced_models.mid.model_name && 
@@ -981,26 +1063,37 @@ export const AISettingsTab: React.FC = () => {
                 <div className="space-y-1.5">
                   <Label className="text-xs flex items-center justify-between">
                     Model Name
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleRefreshModels(draftSettings.ai_endpoints.advanced_models.intelligent.provider)}
-                      disabled={refreshingModels === draftSettings.ai_endpoints.advanced_models.intelligent.provider}
-                      className="h-6 w-6 p-0"
-                    >
-                      {refreshingModels === draftSettings.ai_endpoints.advanced_models.intelligent.provider ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <RefreshCw className="h-3 w-3" />
-                      )}
-                    </Button>
+                    {!manualModelEntry && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRefreshModels(draftSettings.ai_endpoints.advanced_models.intelligent.provider)}
+                        disabled={refreshingModels === draftSettings.ai_endpoints.advanced_models.intelligent.provider}
+                        className="h-6 w-6 p-0"
+                      >
+                        {refreshingModels === draftSettings.ai_endpoints.advanced_models.intelligent.provider ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <RefreshCw className="h-3 w-3" />
+                        )}
+                      </Button>
+                    )}
                   </Label>
-                  <Combobox
-                    value={draftSettings.ai_endpoints.advanced_models.intelligent.model_name}
-                    onValueChange={(value) => handleAdvancedModelChange('intelligent', 'model_name', value)}
-                    options={getModelsForModelType('intelligent')}
-                    placeholder="Select model"
-                  />
+                  {manualModelEntry ? (
+                    <Input
+                      value={draftSettings.ai_endpoints.advanced_models.intelligent.model_name}
+                      onChange={(e) => handleAdvancedModelChange('intelligent', 'model_name', e.target.value)}
+                      placeholder="e.g., gpt-4o or claude-3-5-sonnet"
+                      className="h-8 text-sm"
+                    />
+                  ) : (
+                    <Combobox
+                      value={draftSettings.ai_endpoints.advanced_models.intelligent.model_name}
+                      onValueChange={(value) => handleAdvancedModelChange('intelligent', 'model_name', value)}
+                      options={getModelsForModelType('intelligent')}
+                      placeholder="Select model"
+                    />
+                  )}
                 </div>
                 {/* GPT-5 Thinking Level Selector */}
                 {draftSettings.ai_endpoints.advanced_models.intelligent.model_name && 
@@ -1078,26 +1171,37 @@ export const AISettingsTab: React.FC = () => {
                 <div className="space-y-1.5">
                   <Label className="text-xs flex items-center justify-between">
                     Model Name
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleRefreshModels(draftSettings.ai_endpoints.advanced_models.verifier.provider)}
-                      disabled={refreshingModels === draftSettings.ai_endpoints.advanced_models.verifier.provider}
-                      className="h-6 w-6 p-0"
-                    >
-                      {refreshingModels === draftSettings.ai_endpoints.advanced_models.verifier.provider ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <RefreshCw className="h-3 w-3" />
-                      )}
-                    </Button>
+                    {!manualModelEntry && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRefreshModels(draftSettings.ai_endpoints.advanced_models.verifier.provider)}
+                        disabled={refreshingModels === draftSettings.ai_endpoints.advanced_models.verifier.provider}
+                        className="h-6 w-6 p-0"
+                      >
+                        {refreshingModels === draftSettings.ai_endpoints.advanced_models.verifier.provider ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <RefreshCw className="h-3 w-3" />
+                        )}
+                      </Button>
+                    )}
                   </Label>
-                  <Combobox
-                    value={draftSettings.ai_endpoints.advanced_models.verifier.model_name}
-                    onValueChange={(value) => handleAdvancedModelChange('verifier', 'model_name', value)}
-                    options={getModelsForModelType('verifier')}
-                    placeholder="Select model"
-                  />
+                  {manualModelEntry ? (
+                    <Input
+                      value={draftSettings.ai_endpoints.advanced_models.verifier.model_name}
+                      onChange={(e) => handleAdvancedModelChange('verifier', 'model_name', e.target.value)}
+                      placeholder="e.g., gpt-4o or claude-3-5-sonnet"
+                      className="h-8 text-sm"
+                    />
+                  ) : (
+                    <Combobox
+                      value={draftSettings.ai_endpoints.advanced_models.verifier.model_name}
+                      onValueChange={(value) => handleAdvancedModelChange('verifier', 'model_name', value)}
+                      options={getModelsForModelType('verifier')}
+                      placeholder="Select model"
+                    />
+                  )}
                 </div>
                 {/* GPT-5 Thinking Level Selector */}
                 {draftSettings.ai_endpoints.advanced_models.verifier.model_name && 

@@ -28,8 +28,11 @@ Connect to any OpenAI-compatible API endpoint. This is the most flexible option.
 
 - **OpenRouter**: `https://openrouter.ai/api/v1/`
 - **OpenAI**: `https://api.openai.com/v1/`
+- **Azure OpenAI**: `https://your-resource.openai.azure.com/openai/v1/` (must end with `/openai/v1/`)
 - **Local Ollama**: `http://host.docker.internal:11434/v1/` or check your ollama config
 - **Local vLLM**: `http://host.docker.internal:8000/v1/` or check your vllm config
+
+> **Note**: Different providers require specific URL path suffixes. Azure OpenAI requires `/openai/v1/`, while most OpenAI-compatible APIs use `/v1/`. Always verify the correct format for your provider.
 
 ### OpenRouter
 
@@ -72,6 +75,26 @@ Direct access to OpenAI's GPT models.
 - gpt-4o-mini
 
 **Pricing**: Check [OpenAI Pricing](https://openai.com/api/pricing)
+
+### Azure OpenAI
+
+Use Azure-hosted OpenAI models through your Azure subscription.
+
+**Setup:**
+
+1. Select "Custom Provider" as the AI Provider
+2. API Key: Your Azure OpenAI API key
+3. Base URL: `https://your-resource.openai.azure.com/openai/v1/`
+   - **Important**: URL must end with `/openai/v1/` (not `/openai/deployments/`)
+4. Enable **Manual Model Entry** toggle in Model Selection
+5. Enter your Azure deployment names directly (e.g., `gpt-4`, `gpt-5-preview`)
+
+**Manual Model Entry:**
+
+Azure OpenAI doesn't support the `/models` endpoint, so you must use manual model entry:
+- Toggle the switch in the Model Selection card header
+- Enter your exact deployment names (not model names)
+- Example: If you deployed GPT-4 as "my-gpt4-deployment", enter that exact name
 
 ## Configuration Mode
 
