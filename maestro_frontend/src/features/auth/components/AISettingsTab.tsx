@@ -462,6 +462,7 @@ export const AISettingsTab: React.FC = () => {
                             onChange={(e) => handleApiKeyChange('api_key', e.target.value)}
                             placeholder="sk-or-..."
                             className="h-8 text-sm"
+                            autoComplete="off"
                           />
                           <Button
                             variant="outline"
@@ -519,6 +520,7 @@ export const AISettingsTab: React.FC = () => {
                             onChange={(e) => handleApiKeyChange('api_key', e.target.value)}
                             placeholder="sk-..."
                             className="h-8 text-sm"
+                            autoComplete="off"
                           />
                           <Button
                             variant="outline"
@@ -576,6 +578,7 @@ export const AISettingsTab: React.FC = () => {
                             onChange={(e) => handleApiKeyChange('api_key', e.target.value)}
                             placeholder="API key (optional)"
                             className="h-8 text-sm"
+                            autoComplete="off"
                           />
                           <Button
                             variant="outline"
@@ -906,8 +909,8 @@ export const AISettingsTab: React.FC = () => {
                   <Label className="text-xs">API Key</Label>
                   <Input
                     type={editingApiKey['fast-api-key'] ? 'text' : 'password'}
-                    value={editingApiKey['fast-api-key'] ? 
-                      (draftSettings.ai_endpoints.advanced_models.fast.api_key || '') : 
+                    value={editingApiKey['fast-api-key'] ?
+                      (draftSettings.ai_endpoints.advanced_models.fast.api_key || '') :
                       formatApiKeyDisplay(draftSettings.ai_endpoints.advanced_models.fast.api_key)
                     }
                     onChange={(e) => handleAdvancedModelChange('fast', 'api_key', e.target.value)}
@@ -915,6 +918,7 @@ export const AISettingsTab: React.FC = () => {
                     onBlur={() => handleApiKeyBlur('fast-api-key')}
                     placeholder="API key (optional)"
                     className="h-8 text-sm"
+                    autoComplete="off"
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -1014,8 +1018,8 @@ export const AISettingsTab: React.FC = () => {
                   <Label className="text-xs">API Key</Label>
                   <Input
                     type={editingApiKey['mid-api-key'] ? 'text' : 'password'}
-                    value={editingApiKey['mid-api-key'] ? 
-                      (draftSettings.ai_endpoints.advanced_models.mid.api_key || '') : 
+                    value={editingApiKey['mid-api-key'] ?
+                      (draftSettings.ai_endpoints.advanced_models.mid.api_key || '') :
                       formatApiKeyDisplay(draftSettings.ai_endpoints.advanced_models.mid.api_key)
                     }
                     onChange={(e) => handleAdvancedModelChange('mid', 'api_key', e.target.value)}
@@ -1023,6 +1027,7 @@ export const AISettingsTab: React.FC = () => {
                     onBlur={() => handleApiKeyBlur('mid-api-key')}
                     placeholder="API key (optional)"
                     className="h-8 text-sm"
+                    autoComplete="off"
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -1122,8 +1127,8 @@ export const AISettingsTab: React.FC = () => {
                   <Label className="text-xs">API Key</Label>
                   <Input
                     type={editingApiKey['intelligent-api-key'] ? 'text' : 'password'}
-                    value={editingApiKey['intelligent-api-key'] ? 
-                      (draftSettings.ai_endpoints.advanced_models.intelligent.api_key || '') : 
+                    value={editingApiKey['intelligent-api-key'] ?
+                      (draftSettings.ai_endpoints.advanced_models.intelligent.api_key || '') :
                       formatApiKeyDisplay(draftSettings.ai_endpoints.advanced_models.intelligent.api_key)
                     }
                     onChange={(e) => handleAdvancedModelChange('intelligent', 'api_key', e.target.value)}
@@ -1131,6 +1136,7 @@ export const AISettingsTab: React.FC = () => {
                     onBlur={() => handleApiKeyBlur('intelligent-api-key')}
                     placeholder="API key (optional)"
                     className="h-8 text-sm"
+                    autoComplete="off"
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -1230,8 +1236,8 @@ export const AISettingsTab: React.FC = () => {
                   <Label className="text-xs">API Key</Label>
                   <Input
                     type={editingApiKey['verifier-api-key'] ? 'text' : 'password'}
-                    value={editingApiKey['verifier-api-key'] ? 
-                      (draftSettings.ai_endpoints.advanced_models.verifier.api_key || '') : 
+                    value={editingApiKey['verifier-api-key'] ?
+                      (draftSettings.ai_endpoints.advanced_models.verifier.api_key || '') :
                       formatApiKeyDisplay(draftSettings.ai_endpoints.advanced_models.verifier.api_key)
                     }
                     onChange={(e) => handleAdvancedModelChange('verifier', 'api_key', e.target.value)}
@@ -1239,6 +1245,7 @@ export const AISettingsTab: React.FC = () => {
                     onBlur={() => handleApiKeyBlur('verifier-api-key')}
                     placeholder="API key (optional)"
                     className="h-8 text-sm"
+                    autoComplete="off"
                   />
                 </div>
                 <div className="space-y-1.5">
